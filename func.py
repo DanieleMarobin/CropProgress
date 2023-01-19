@@ -1,9 +1,13 @@
-import requests 
+import os
+from datetime import datetime as dt
+import requests
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 import plotly.express as px
 import plotly.graph_objects as go
+
+from calendar import isleap
 
 API_KEY = "F1BC9835-9E98-349E-AAA1-28B4142D289A"
 
@@ -29,6 +33,40 @@ crop_progress=[t.title() for t in crop_progress]
 
 
 # Functions
+def last_leap_year():    
+    start=dt.today().year
+    while(True):
+        if isleap(start): return start
+        start-=1
+
+def add_seas_day(df, ref_year_start= dt.today(), date_col=None):
+    if date_col==None:
+        df['seas_day'] = [seas_day(d,ref_year_start) for d in df.index]
+    else:
+        df['seas_day'] = [seas_day(d,ref_year_start) for d in df[date_col]]
+    return df
+
+def seas_day(date, ref_year_start= dt.today()):
+    """
+    'seas_day' is the X-axis of the seasonal plot:
+            - it makes sure to include 29 Feb
+            - it is very useful in creating weather windows
+    """
+    LLY = last_leap_year()
+    start_idx = 100 * ref_year_start.month + ref_year_start.day
+    date_idx = 100 * date.month + date.day
+
+    if (start_idx<300):
+        if (date_idx>=start_idx):
+            return dt(LLY, date.month, date.day)
+        else:
+            return dt(LLY+1, date.month, date.day)
+    else:
+        if (date_idx>=start_idx):
+            return dt(LLY-1, date.month, date.day)
+        else:
+            return dt(LLY, date.month, date.day)
+
 def add_today(fig, df, x_col, y_col, today_idx=None, size=10, color='red', symbol='star', name='Today', model=None, row=1, col=1):
     """
     if 'model' is not None, it will calculate the prediction
@@ -59,20 +97,18 @@ def get_conditions(state_name:str, class_desc:str) -> pd.DataFrame:
     response = requests.get(url_progress)
     df = pd.json_normalize(response.json()['data'])
 
-    df[['year', 'end_code', 'Value']] = df[['year', 'end_code', 'Value']].astype(int)
-    df['week_ending'] = pd.to_datetime(df['week_ending'])
-    df = df[df['unit_desc'].isin(['PCT EXCELLENT', 'PCT GOOD'])].groupby(['year', 'end_code', 'week_ending'], as_index=False).agg({'Value': 'sum'})
-    df['day'] = df['week_ending'].dt.day
-    df['month'] = df['week_ending'].dt.month
-    df['new_year'] = df['week_ending'].dt.year
-    df=df.rename({'year':'year1'}, axis=1)
+    df[['year', 'Value']] = df[['year', 'Value']].astype(int)
+    df['week_ending'] = pd.to_datetime(df['week_ending'])    
 
-    # 'seas_day' is to chart seasonally
-    df['year'] = np.where(df['new_year']==df['year1'], 2020, 2019)
-    df['seas_day'] = pd.to_datetime(df[['year', 'month', 'day']])
-    df = df.drop(['day', 'month', 'new_year', 'year'], axis=1)
-    df=df.rename({'year1':'year'}, axis=1)
-    df = df.sort_values(by=['year', 'seas_day'])
+    mask=df['unit_desc'].isin(['PCT EXCELLENT', 'PCT GOOD'])
+    df = df[mask].groupby(['year', 'week_ending'], as_index=False).agg({'Value': 'sum'})
+
+    mask=(df['Value']>0) # this to drop the 0s 
+    df=df[mask]
+    df=df.set_index('week_ending')
+    
+    df=inside_yearly_interpolation(df,'year')
+    df=add_seas_day(df, dt(dt.today().year,9,1))
     return df
 
 def get_yields(state_name: str, class_desc: str) -> pd.DataFrame:
@@ -110,7 +146,7 @@ def get_conditions_chart(df: pd.DataFrame, state_name:str, class_desc:str, hover
     fig.add_trace(go.Scatter(x=df[mask]['seas_day'], y=df[mask]['Value'],fill=None, mode='lines', name=str(last_year-1),text=str(last_year), line=dict(color='black', width=3)))
 
     mask=df['year']==last_year
-    fig.add_trace(go.Scatter(x=df[mask]['seas_day'], y=df[mask]['Value'],fill=None, mode='lines+markers', name=str(last_year), text=str(last_year), line=dict(color='firebrick', width=4)))
+    fig.add_trace(go.Scatter(x=df[mask]['seas_day'], y=df[mask]['Value'],fill=None, mode='lines', name=str(last_year), text=str(last_year), line=dict(color='red', width=4)))
 
     fig.update_layout(hovermode=hovermode, width=1000, height=850, xaxis=dict(tickformat="%b %d"))
     return fig
@@ -121,16 +157,11 @@ def get_yields_charts(df_conditions: pd.DataFrame, state_name:str, class_desc:st
     if not last_year in df_yields.index:
         df_yields.loc[last_year] = df_yields.loc[last_year-1]
 
-    # I don't know why Semen didn't just get the last available row
-    # Instead of a asking for 1) last seas day -> 2) identify last day in the last year
-    mask= (df_conditions['year']==last_year)
-    last_day = df_conditions[mask]['seas_day'].max()
+    i=df_conditions.index
+    last_day = i[-1]
 
-    mask= ((df_conditions['year']==last_year) & (df_conditions['seas_day']==last_day))
-    last_week = df_conditions[mask]['end_code'].values[0]
-
-    # Get all the corresponding weeks of all years
-    mask=(df_conditions['end_code']==last_week)
+    mask= ((i.month==last_day.month) & (i.day==last_day.day))
+    
     df_conditions = df_conditions[mask]
     df_conditions = df_conditions.merge(df_yields, left_on='year', right_index=True,) # Add the yield
 
@@ -182,4 +213,29 @@ def get_yields_charts(df_conditions: pd.DataFrame, state_name:str, class_desc:st
 
     return fo
 
+def inside_yearly_interpolation(df, col_year):
+    """
+    Important:
+        - I normally pass a very simple df, with year and value and a time index
+        - it is important because at the end it just interpolates
+        - as it is done on an yearly basis, the year col is going to remain a constant
+        - the rest needs to be paid attention to
 
+    the idea is to recreate a new Dataframe by concatenating the yearly interpolated ones
+    so there is no risk of interpolating from the end of a crop year to the beginning of the next one
+    """
+    dfs=[]
+    years=np.sort(df[col_year].unique())
+
+    for y in years:
+        mask=(df[col_year]==y)
+
+        dfs.append(df[mask].resample('1d').asfreq().interpolate())
+    
+    return pd.concat(dfs)
+
+# Utilities
+def show_excel_index(df, file='check', index=True):
+    program =r'"C:\Program Files\Microsoft Office\root\Office16\EXCEL.EXE"'
+    df.to_csv(file+'.csv', index=index,)    
+    os.system("start " +program+ " "+file+'.csv')

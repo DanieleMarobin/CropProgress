@@ -1,5 +1,5 @@
 import streamlit as st
-import resources as rs
+import func as rs
 
 st.set_page_config(page_title='Crop Conditions',layout='wide',initial_sidebar_state='expanded')
 st.markdown("### Crop Conditions")
