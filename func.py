@@ -121,7 +121,7 @@ def get_CCI_yield_model_charts(df_conditions: pd.DataFrame, state:str, commodity
 
     fo = []
     # Yield Chart
-    if True:
+    if False:
         x='Conditions'
         y='Yield'    
         fig = px.scatter(df_conditions, x=x, y=y, text='year', trendline="ols")
