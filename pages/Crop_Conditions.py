@@ -1,28 +1,43 @@
+from datetime import datetime as dt
 import streamlit as st
+import QuickStats as qs
 import func as fu
+
+if 'crop_conditions' not in st.session_state:
+    st.session_state['crop_conditions']={}
 
 st.set_page_config(page_title='Crop Conditions',layout='wide',initial_sidebar_state='expanded')
 st.markdown("### Crop Conditions")
 st.markdown("---")
 
 with st.sidebar:
-    col11, col21 = st.columns(2)
-    add_grain = st.selectbox("Choose a Class", fu.grains_class,2)
-    if add_grain == 'WINTER'.title():
-        add_region = st.selectbox("Choose a Region", fu.wwht_regions)
-    elif add_grain == 'SPRING, (EXCL DURUM)'.title():
-        add_region = st.selectbox("Choose a Region", fu.swht_regions)
-    elif add_grain == 'SPRING, DURUM'.title():
-        add_region = st.selectbox("Choose a Region", fu.durum_regions)
+    crop_year_start=dt(dt.today().year,1,1)
+    commodity = st.selectbox("Commodity", fu.commodities, 0)
+
+    if commodity in st.session_state['crop_conditions']:
+        options_states=st.session_state['crop_conditions'][commodity]['options_states']
+    else:
+        with st.spinner('Checking Available States...'):
+            options_states=qs.get_USA_conditions_states(commodity)
+            st.session_state['crop_conditions'][commodity]={'options_states':options_states}
     
+    # Commodity customization
+    if commodity != 'WHEAT, SPRING, DURUM'.title():
+        options_states=['US Total'] + options_states
+    if commodity == 'WHEAT, WINTER'.title():        
+        crop_year_start=dt(dt.today().year,9,1)
+
+    state = st.selectbox("State", options_states)
+
     hovermode = st.selectbox('Hovermode',['x', 'y', 'closest', 'x unified', 'y unified'],index=2)
 
-df = fu.get_conditions(add_region, add_grain)
-st.plotly_chart(fu.get_conditions_chart(df, add_region, add_grain, hovermode=hovermode), use_container_width=True)
 
-fig_model = fu.get_yields_charts(df, add_region, add_grain, hovermode=hovermode)
+df = fu.get_conditions(state, commodity, crop_year_start=crop_year_start)
+st.plotly_chart(fu.get_conditions_chart(df, state, commodity, hovermode=hovermode), use_container_width=True)
 
-for f in fig_model:
+all_fig_model_chart = fu.get_CCI_yield_model_charts(df, state, commodity, hovermode=hovermode)
+
+for f in all_fig_model_chart:
     st.markdown("---")
     st.plotly_chart(f['fig'], use_container_width=True)
 
