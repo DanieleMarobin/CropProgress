@@ -25,7 +25,6 @@ with st.sidebar:
 
 
     if ((commodity in st.session_state['crop_progress']) and ('options_variables' in st.session_state['crop_progress'][commodity])):
-        st.write('found')
         options_variables=st.session_state['crop_progress'][commodity]['options_variables']
     else:   
         with st.spinner('Checking Available Progress Variables...'):
