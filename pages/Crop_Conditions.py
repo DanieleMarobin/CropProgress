@@ -35,6 +35,10 @@ with st.sidebar:
 df = fu.get_conditions(state, commodity, crop_year_start=crop_year_start)
 st.plotly_chart(fu.get_conditions_chart(df, state, commodity, hovermode=hovermode), use_container_width=True)
 
+# Extending the df so to have all the years in the scatter plot
+df = df.pivot(index='seas_day',columns='year',values='Value').fillna(method='ffill').fillna(method='bfill').melt(ignore_index=False)
+df['seas_day']=df.index
+df=df.rename(columns={'value':'Value'})
 all_fig_model_chart = fu.get_CCI_yield_model_charts(df, state, commodity, hovermode=hovermode)
 
 for f in all_fig_model_chart:
