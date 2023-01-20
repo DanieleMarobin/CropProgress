@@ -16,7 +16,7 @@ with st.sidebar:
     crop_year_start=dt(dt.today().year,1,1)
     commodity = st.selectbox("Commodity", fu.commodities, 0)
 
-    if ((commodity in st.session_state['crop_progress']) & ('options_states' in st.session_state['crop_progress'][commodity])):
+    if ((commodity in st.session_state['crop_progress']) and ('options_states' in st.session_state['crop_progress'][commodity])):
         options_states=st.session_state['crop_progress'][commodity]['options_states']
     else:
         with st.spinner('Checking Available States...'):
@@ -24,7 +24,7 @@ with st.sidebar:
             st.session_state['crop_progress'][commodity]={'options_states':options_states}
 
 
-    if ((commodity in st.session_state['crop_progress']) & ('options_variables' in st.session_state['crop_progress'][commodity])):
+    if ((commodity in st.session_state['crop_progress']) and ('options_variables' in st.session_state['crop_progress'][commodity])):
         st.write('found')
         options_variables=st.session_state['crop_progress'][commodity]['options_variables']
     else:   
