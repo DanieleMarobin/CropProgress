@@ -200,7 +200,7 @@ def get_USA_progress(commodity='CORN', progress_var=None, aggregate_level='NATIO
 
     return fo
 
-def get_production(commodity='CORN', aggregate_level='NATIONAL', years=list(range(1800,2050)), cols_subset=[]):
+def get_USA_production(commodity='CORN', aggregate_level='NATIONAL', years=list(range(1800,2050)), cols_subset=[]):
     """
     df_prod=qs.get_QS_production('soybeans', aggregate_level='COUNTY', years=[2017])\n
 
