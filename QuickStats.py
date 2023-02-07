@@ -123,9 +123,9 @@ def get_USA_yields(commodity='CORN', aggregate_level='NATIONAL', state_name=[], 
         dl.short_desc.append(commodity+' - YIELD, MEASURED IN BU / ACRE')
     elif commodity=='WHEAT':
         dl.short_desc.append(commodity+' - YIELD, MEASURED IN BU / ACRE')
-    elif commodity=='WHEAT, WINTER':
-        commodity='WHEAT'
+    elif commodity=='WHEAT, WINTER':        
         dl.short_desc.append(commodity+' - YIELD, MEASURED IN BU / ACRE')
+        commodity='WHEAT'
     elif commodity=='WHEAT, SPRING, (EXCL DURUM)':
         commodity='WHEAT'
         dl.short_desc.append(commodity+' - YIELD, MEASURED IN BU / ACRE')
@@ -200,9 +200,9 @@ def get_USA_progress(commodity='CORN', progress_var=None, aggregate_level='NATIO
 
     return fo
 
-def get_USA_production(commodity='CORN', aggregate_level='NATIONAL', years=list(range(1800,2050)), cols_subset=[]):
+def get_USA_production(commodity='CORN', aggregate_level='NATIONAL', state_name=[], years=list(range(1800,2050)), cols_subset=[]):
     """
-    df_prod=qs.get_QS_production('soybeans', aggregate_level='COUNTY', years=[2017])\n
+    df_prod=qs.get_QS_production('soybeans', aggregate_level='STATE', years=[2017])\n
 
     commodity = 'CORN', 'SOYBEANS'\n
     aggregate_level = 'NATIONAL', 'STATE', 'COUNTY'
@@ -213,15 +213,35 @@ def get_USA_production(commodity='CORN', aggregate_level='NATIONAL', years=list(
     dl = QS_input()
     dl.source_desc.append('SURVEY')
     dl.years.extend(years)
-    dl.commodity_desc.append(commodity)
-
+    
     if commodity=='CORN':
         dl.short_desc.append(commodity+', GRAIN - PRODUCTION, MEASURED IN BU')
     elif commodity=='SOYBEANS':
         dl.short_desc.append(commodity+' - PRODUCTION, MEASURED IN BU')
+    elif commodity=='WHEAT':
+        dl.short_desc.append(commodity+' - PRODUCTION, MEASURED IN BU')
+    elif commodity=='WHEAT, WINTER':        
+        dl.short_desc.append(commodity+' - PRODUCTION, MEASURED IN BU')        
+        commodity='WHEAT'
 
+    elif commodity=='WHEAT, WINTER, RED, HARD':        
+        dl.short_desc.append(commodity+' - PRODUCTION, MEASURED IN BU')
+        commodity='WHEAT'
+    elif commodity=='WHEAT, WINTER, RED, SOFT':        
+        dl.short_desc.append(commodity+' - PRODUCTION, MEASURED IN BU')
+        commodity='WHEAT'
+
+    elif commodity=='WHEAT, WINTER, WHITE, HARD':        
+        dl.short_desc.append(commodity+' - PRODUCTION, MEASURED IN BU')
+        commodity='WHEAT'
+    elif commodity=='WHEAT, WINTER, WHITE, SOFT':        
+        dl.short_desc.append(commodity+' - PRODUCTION, MEASURED IN BU')
+        commodity='WHEAT'        
+
+    dl.commodity_desc.append(commodity)
     dl.reference_period_desc.append('YEAR') # This can also be: "YEAR - AUG FORECAST"
     dl.agg_level_desc.append(aggregate_level)
+    dl.state_name.extend(state_name)
 
     fo=get_data(dl)
     if len(cols_subset)>0: fo = fo[cols_subset]
