@@ -119,19 +119,24 @@ def get_USA_yields(commodity='CORN', aggregate_level='NATIONAL', state_name=[], 
     # Edit inputs to make the download possible (for example necessary to modify commodity for spring/winter wheat)
     if commodity=='CORN':
         dl.short_desc.append(commodity+', GRAIN - YIELD, MEASURED IN BU / ACRE')
+
     elif commodity=='SOYBEANS':
         dl.short_desc.append(commodity+' - YIELD, MEASURED IN BU / ACRE')
+
     elif commodity=='WHEAT':
         dl.short_desc.append(commodity+' - YIELD, MEASURED IN BU / ACRE')
+
     elif commodity=='WHEAT, WINTER':        
         dl.short_desc.append(commodity+' - YIELD, MEASURED IN BU / ACRE')
         commodity='WHEAT'
-    elif commodity=='WHEAT, SPRING, (EXCL DURUM)':
-        commodity='WHEAT'
+
+    elif commodity=='WHEAT, SPRING, (EXCL DURUM)':        
         dl.short_desc.append(commodity+' - YIELD, MEASURED IN BU / ACRE')
-    elif commodity=='WHEAT, SPRING, DURUM':
         commodity='WHEAT'
+        
+    elif commodity=='WHEAT, SPRING, DURUM':        
         dl.short_desc.append(commodity+' - YIELD, MEASURED IN BU / ACRE')
+        commodity='WHEAT'
 
     dl.years.extend(years)
     dl.commodity_desc.append(commodity)
