@@ -9,6 +9,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 import QuickStats as qs
+import streamlit as st
 
 # Declaration
 if True:
@@ -52,28 +53,6 @@ def get_progress_chart(commodity, state_name, progress_var, crop_year_start, hov
     fig.update_layout(hovermode=hovermode, width=1000, height=1000, xaxis=dict(tickformat="%b %d"))
     return fig
 
-
-
-
-def get_conditions(state_name, commodity, crop_year_start):
-    if state_name=='US Total':
-        df = qs.get_USA_conditions(commodity, aggregate_level='NATIONAL')
-    else:
-        df = qs.get_USA_conditions(commodity, aggregate_level='STATE', state_name=[state_name])
-
-    df[['year', 'Value']] = df[['year', 'Value']].astype(int)
-    df['week_ending'] = pd.to_datetime(df['week_ending'])
-
-    mask=df['unit_desc'].isin(['PCT EXCELLENT', 'PCT GOOD'])
-    df = df[mask].groupby(['year', 'week_ending'], as_index=False).agg({'Value': 'sum'})
-
-    mask=(df['Value']>0) # this to drop the 0s 
-    df=df[mask]
-    df=df.set_index('week_ending')    
-    df=inside_yearly_interpolation(df,'year')
-    df=add_seas_day(df, crop_year_start)
-    return df
-
 def get_conditions_chart(df: pd.DataFrame, state_name:str, class_desc:str, hovermode: str):
     last_year = df['year'].max()
     title_text = state_name + ' - ' + class_desc +' GE Conditions'
@@ -91,71 +70,86 @@ def get_conditions_chart(df: pd.DataFrame, state_name:str, class_desc:str, hover
     fig.update_layout(hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
     return fig
 
-def get_CCI_yield_model_charts(df_conditions: pd.DataFrame, state:str, commodity:str, hovermode: str):
-
-    if state=='US Total':
-        df_yields =  qs.get_USA_yields(commodity, aggregate_level='NATIONAL', cols_subset=['Value','year'])
-    else:
-        df_yields =  qs.get_USA_yields(commodity, aggregate_level='STATE', state_name=[state], cols_subset=['Value','year'])
-
-    
-    last_year = df_conditions['year'].max()
-    if not last_year in df_yields.index:
-        df_yields.loc[last_year] = df_yields.loc[last_year-1]
-
-    i=df_conditions.index
-    last_day = i[-1]
-
-    mask= ((i.month==last_day.month) & (i.day==last_day.day))
-    
-    df_conditions = df_conditions[mask]
-    df_conditions = df_conditions.merge(df_yields, left_on='year', right_index=True,) # Add the yield
-
-    # Both 'Conditions' (right -> x) and 'Yield' are named 'Value', so after the merging it is necessary to rename
-    df_conditions=df_conditions.rename({'Value_x':'Conditions', 'Value_y':'Yield'}, axis=1)
-    df_conditions['Delta Yield'] = df_conditions['Yield'].diff()
-    df_conditions['Delta Conditions'] = df_conditions['Conditions'].diff()
-    df_conditions['Prev_Yield']=df_conditions['Yield'].shift(1)
-    df_conditions = df_conditions.dropna() # because with Delta, the first one it is going to be NaN (as there is no previous year to the first one)
-    df_conditions=df_conditions.set_index('year',drop=False)
-
+def get_CCI_yield_model_charts(dfs_conditions, dfs_yields, hovermode: str):
     fo = []
-    # Yield Chart
-    if True:
-        x='Conditions'
-        y='Yield'    
-        fig = px.scatter(df_conditions, x=x, y=y, text='year', trendline="ols")
+    for state in dfs_conditions:
+        df = dfs_conditions[state][:]
+        df_yield = dfs_yields[state][:]
+        df_yield=df_yield[['year','Value']]
+        commodity=dfs_yields[state]['commodity_desc'].values[0] + ',' + dfs_yields[state]['class_desc'].values[0]
 
-        all_models=px.get_trendline_results(fig).px_fit_results
-        model=all_models[0]
+        # Pivoting and Extending the df so to have all the years in the scatter plot
+        df = df.pivot(index='seas_day',columns='year',values='Value').fillna(method='ffill').fillna(method='bfill').melt(ignore_index=False)
+        df['seas_day']=df.index
+        df=df.rename(columns={'value':'Value'})
+
+        last_year = df['year'].max()
+        if not last_year in df_yield.index:
+            lvi=df_yield.last_valid_index()
+            df_yield.loc[last_year] = df_yield.loc[lvi]
         
-        add_today(fig=fig,df=df_conditions,x_col=x, y_col=y, size=10, color='red', symbol='star', name='Today', model=None) # add today
-        prediction = add_today(fig=fig,df=df_conditions,x_col=x, y_col=y, size=7, color='black', symbol='x', name='Model', model=model) # add prediction
+        # Selecting the last available day overall
+        last_day = df.index[-1]
+
+        # Selecting the same day for each of the available years
+        mask= ((df.index.month==last_day.month) & (df.index.day==last_day.day))        
+        df = df[mask]
+
+        # Add the yield for each year to the 'condition df'
+        df = df.merge(df_yield, left_on='year', right_index=True,)
+
+        # Both 'Conditions' (right -> x) and 'Yield' are named 'Value', so after the merging it is necessary to rename
+        df=df.rename({'Value_x':'Conditions', 'Value_y':'Yield'}, axis=1)
+        df['Delta Yield'] = df['Yield'].diff()
+        df['Delta Conditions'] = df['Conditions'].diff()
+        df['Prev_Yield']=df['Yield'].shift(1)
+        df = df.dropna() # because with Delta, the first one it is going to be NaN (as there is no previous year to the first one)
+        df=df.set_index('year',drop=False)
+                
+        # Diagnostics
+        if False:
+            st.write(state)
+            st.write(dfs_conditions[state][:])
+            st.write(df_yield)
+            st.write(df)
+        
+        # Yield Chart
+        if False and len(df)>0:
+            x='Conditions'
+            y='Yield'
+            fig = px.scatter(df, x=x, y=y, text='year', trendline="ols")
+
+            all_models=px.get_trendline_results(fig).px_fit_results
+            model=all_models[0]
             
-        title=state +' - ' + commodity + ' - '+y+' vs ' + x + ' - Prediction: ' + format(prediction,'.2f')
-        fig.update_traces(textposition="top center")
-        fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
-        fo.append({'fig':fig,'model':model})
+            add_today(fig=fig,df=df,x_col=x, y_col=y, size=10, color='red', symbol='star', name='Today', model=None) # add today
+            prediction = add_today(fig=fig,df=df,x_col=x, y_col=y, size=7, color='black', symbol='x', name='Model', model=model) # add prediction
+                
+            title=state +' - ' + commodity + ' - '+y+' vs ' + x + ' - Prediction: ' + format(prediction,'.2f')
+            fig.update_traces(textposition="top center")
+            fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
+            fo.append({'fig':fig,'model':model})
 
-    # Delta Chart
-    if True:
-        x='Delta Conditions'
-        y='Delta Yield'
-        fig = px.scatter(df_conditions, x=x, y=y, text='year', trendline="ols")
+        # Delta Chart
+        if True and len(df)>0:
+            x='Delta Conditions'
+            y='Delta Yield'
+            fig = px.scatter(df, x=x, y=y, text='year', trendline="ols")
 
-        all_models=px.get_trendline_results(fig).px_fit_results
-        model=all_models[0]
-        
-        add_today(fig=fig,df=df_conditions,x_col=x, y_col=y, size=10, color='red', symbol='star', name='Today', model=None) # add today
-        prediction = df_conditions['Prev_Yield'].values[-1]+ add_today(fig=fig,df=df_conditions,x_col=x, y_col=y, size=7, color='black', symbol='x', name='Model', model=model) # add prediction
-        
-        # As this is a delta chart, I need to add the previous year to the estimate
+            all_models=px.get_trendline_results(fig).px_fit_results
+            model=all_models[0]
+            
+            add_today(fig=fig,df=df,x_col=x, y_col=y, size=10, color='red', symbol='star', name='Today', model=None) # add today
+            prediction = df['Prev_Yield'].values[-1]+ add_today(fig=fig,df=df,x_col=x, y_col=y, size=7, color='black', symbol='x', name='Model', model=model) # add prediction
+            
+            # As this is a delta chart, I need to add the previous year to the estimate
 
-        title=state +' - ' + commodity + ' - '+y+' vs ' + x +' (YOY) ' + ' - Prediction: ' + format(prediction,'.2f')
-        fig.update_traces(textposition="top center")
-        fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
-        fo.append({'fig':fig,'model':model})
+            title=state +' - ' + commodity + ' - '+y+' vs ' + x +' (YOY) ' + ' - Prediction: ' + format(prediction,'.2f')
+            fig.update_traces(textposition="top center")
+            fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
+            fo.append({'fig':fig,'model':model})
 
+            # st.plotly_chart(fig, use_container_width=True)
     return fo
 
 
@@ -238,8 +232,3 @@ def inside_yearly_interpolation(df, col_year):
         dfs.append(df[mask].resample('1d').asfreq().interpolate())
     
     return pd.concat(dfs)
-
-def show_excel_index(df, file='check', index=True):
-    program =r'"C:\Program Files\Microsoft Office\root\Office16\EXCEL.EXE"'
-    df.to_csv(file+'.csv', index=index,)    
-    os.system("start " +program+ " "+file+'.csv')
