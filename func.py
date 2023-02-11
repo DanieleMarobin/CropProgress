@@ -123,7 +123,7 @@ def get_CCI_yield_model_charts(dfs_conditions, dfs_yields, hovermode: str):
         if True and len(df)>0:
             x='year'
             y='Value'
-            st.write(df_yield)
+            # st.write(df_yield)
             # mask=df_yield.index<2023
             fig = px.scatter(df_yield, x=x, y=y, text='year', trendline="ols")
 
