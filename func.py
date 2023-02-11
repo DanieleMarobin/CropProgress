@@ -83,11 +83,17 @@ def get_CCI_yield_model_charts(dfs_conditions, dfs_yields, hovermode: str):
         df['seas_day']=df.index
         df=df.rename(columns={'value':'Value'})
 
-        last_year = df['year'].max()
+        last_year = int(df['year'].max())
         if not last_year in df_yield.index:
             lvi=df_yield.last_valid_index()
-            df_yield.loc[last_year] = df_yield.loc[lvi]
-        
+            df_yield.loc[last_year] = df_yield.loc[lvi] # add row/index for the current year to be able to calculate the trend yield
+            df_yield['year']=df_yield.index # becuase otherwise 'year' is wrong
+            # st.write(df_yield)
+            # st.write(trend_yield(df_yield, start_year=last_year, rolling=False))
+            df_yield.loc[last_year] =trend_yield(df_yield, start_year=last_year, n_years_min=1000, rolling=False).loc[last_year][['trend_yield']].values[0]
+            df_yield['year']=df_yield.index
+
+
         # Selecting the last available day overall
         last_day = df.index[-1]
 
@@ -113,8 +119,27 @@ def get_CCI_yield_model_charts(dfs_conditions, dfs_yields, hovermode: str):
             st.write(df_yield)
             st.write(df)
         
-        # Yield Chart
-        if False and len(df)>0:
+        # Historical Yield
+        if True and len(df)>0:
+            x='year'
+            y='Value'
+            st.write(df_yield)
+            # mask=df_yield.index<2023
+            fig = px.scatter(df_yield, x=x, y=y, text='year', trendline="ols")
+
+            all_models=px.get_trendline_results(fig).px_fit_results
+            model=all_models[0]
+            
+            add_today(fig=fig,df=df_yield,x_col=x, y_col=y, size=10, color='red', symbol='star', name='Today', model=None) # add today
+            prediction = add_today(fig=fig,df=df_yield,x_col=x, y_col=y, size=7, color='black', symbol='x', name='Model', model=model) # add prediction
+                
+            title=state +' - ' + commodity + ' - '+y+' vs ' + x + ' - Prediction: ' + format(prediction,'.2f')
+            fig.update_traces(textposition="top center")
+            fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
+            fo.append({'fig':fig,'model':model})
+
+        # Yield vs Conditions Chart
+        if True and len(df)>0:
             x='Conditions'
             y='Yield'
             fig = px.scatter(df, x=x, y=y, text='year', trendline="ols")
@@ -232,3 +257,96 @@ def inside_yearly_interpolation(df, col_year):
         dfs.append(df[mask].resample('1d').asfreq().interpolate())
     
     return pd.concat(dfs)
+
+def predict_with_model(model, pred_df):
+    if (('const' in model.params) & ('const' not in pred_df.columns)):
+        pred_df = sm.add_constant(pred_df, has_constant='add')
+
+    return model.predict(pred_df[model.params.index])
+
+
+def Fit_Model(df, y_col: str, x_cols=[], exclude_from=None, extract_only=None):
+    """
+    'exclude_from' needs to be consistent with the df index
+    """
+
+    if not ('const' in df.columns):
+        df = sm.add_constant(df, has_constant='add')
+
+    if not ('const' in x_cols):        
+        x_cols.append('const')
+
+    if exclude_from!=None:
+        df=df.loc[df.index<exclude_from]
+
+    y_df = df[[y_col]]
+
+    if (len(x_cols)>0):
+        X_df=df[x_cols]
+    else:
+        X_df=df.drop(columns = y_col)
+
+    model = sm.OLS(y_df, X_df).fit()
+
+    if extract_only is None:
+        fo = model
+    elif extract_only == 'rsquared':
+        fo = model.rsquared
+
+    return fo
+
+def trend_yield(df_yield, start_year=None, n_years_min=20, rolling=False):
+    """
+    'start_year'
+        - start calculating the trend yield from this year
+        - if I put 1995 it will calculate the trend year for 1995 taking into account data up to 1994
+
+    'n_years_min'
+        - minimum years included for the trend year calculation
+        - if I put 10, and I need to calculate 1995, it will take years from 1985 to 1994 (both included)
+    
+    simple way to get the input 'df_yield'
+
+    import APIs.QuickStats as qs
+    df_yield=qs.get_USA_yields(cols_subset=['Value','year'])
+    """
+
+    yield_str='yield'
+    trend_str='trend_yield'
+    devia_str='yield_deviation'
+
+    if df_yield.index.name != 'year':
+        df_yield=df_yield.set_index('year',drop=False)
+
+    year_min=int(df_yield.index.min())
+    year_max=int(df_yield.index.max())
+
+    if start_year is None:
+        start_year=year_min
+
+    fo_dict={'year':[], trend_str:[] }
+    for y in range(start_year,year_max+1):
+        # this to avoid having nothing when we are considering the first year of the whole df
+        year_to=max(y-1,year_min) 
+        if rolling:
+            mask=((df_yield.index>=y-n_years_min) & (df_yield.index<=year_to))
+        else:
+            mask=((df_yield.index>=start_year-n_years_min) & (df_yield.index<=year_to))
+
+        df_model=df_yield[mask]
+        print(df_model)
+        model=Fit_Model(df_model,y_col='Value',x_cols=['year'])
+        pred = predict_with_model(model,df_yield.loc[y:y])
+
+        fo_dict['year'].append(y)
+        fo_dict[trend_str].append(pred[y])
+
+    df=pd.DataFrame(fo_dict)
+    df=df.set_index('year')
+
+    df=pd.concat([df_yield,df],axis=1,join='inner')
+
+    df=df.rename(columns={'Value':yield_str})
+    df[devia_str]=100.0*( df[yield_str]/df[trend_str]-1.0)
+    df=df.set_index('year')
+    return df
