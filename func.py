@@ -88,8 +88,6 @@ def get_CCI_yield_model_charts(dfs_conditions, dfs_yields, hovermode: str):
             lvi=df_yield.last_valid_index()
             df_yield.loc[last_year] = df_yield.loc[lvi] # add row/index for the current year to be able to calculate the trend yield
             df_yield['year']=df_yield.index # becuase otherwise 'year' is wrong
-            # st.write(df_yield)
-            # st.write(trend_yield(df_yield, start_year=last_year, rolling=False))
             df_yield.loc[last_year] =trend_yield(df_yield, start_year=last_year, n_years_min=1000, rolling=False).loc[last_year][['trend_yield']].values[0]
             df_yield['year']=df_yield.index
 
@@ -112,13 +110,6 @@ def get_CCI_yield_model_charts(dfs_conditions, dfs_yields, hovermode: str):
         df = df.dropna() # because with Delta, the first one it is going to be NaN (as there is no previous year to the first one)
         df=df.set_index('year',drop=False)
                 
-        # Diagnostics
-        if False:
-            st.write(state)
-            st.write(dfs_conditions[state][:])
-            st.write(df_yield)
-            st.write(df)
-        
         # Historical Yield
         if True and len(df)>0:
             x='year'
@@ -136,10 +127,10 @@ def get_CCI_yield_model_charts(dfs_conditions, dfs_yields, hovermode: str):
             title=state +' - ' + commodity + ' - '+y+' vs ' + x + ' - Prediction: ' + format(prediction,'.2f')
             fig.update_traces(textposition="top center")
             fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
-            fo.append({'fig':fig,'model':model})
+            fo.append({'state':state,'fig':fig,'model':model, 'df':df})
 
         # Yield vs Conditions Chart
-        if True and len(df)>0:
+        if False and len(df)>0:
             x='Conditions'
             y='Yield'
             fig = px.scatter(df, x=x, y=y, text='year', trendline="ols")
@@ -153,7 +144,7 @@ def get_CCI_yield_model_charts(dfs_conditions, dfs_yields, hovermode: str):
             title=state +' - ' + commodity + ' - '+y+' vs ' + x + ' - Prediction: ' + format(prediction,'.2f')
             fig.update_traces(textposition="top center")
             fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
-            fo.append({'fig':fig,'model':model})
+            fo.append({'state':state,'fig':fig,'model':model, 'df':df})
 
         # Delta Chart
         if True and len(df)>0:
@@ -172,12 +163,75 @@ def get_CCI_yield_model_charts(dfs_conditions, dfs_yields, hovermode: str):
             title=state +' - ' + commodity + ' - '+y+' vs ' + x +' (YOY) ' + ' - Prediction: ' + format(prediction,'.2f')
             fig.update_traces(textposition="top center")
             fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
-            fo.append({'fig':fig,'model':model})
+            fo.append({'state':state,'fig':fig,'model':model, 'df':df})
 
-            # st.plotly_chart(fig, use_container_width=True)
     return fo
 
+def get_CCI_us_total(df,hovermode: str):
+    fo = []
+    df['year']=df.index
 
+    last_year = int(df['year'].max())
+    df.loc[last_year,'us_total_yield'] =trend_yield(df, start_year=last_year, n_years_min=1000, rolling=False, yield_col='us_total_yield').loc[last_year][['trend_yield']].values[0]
+
+    # Historical Yield
+    if True and len(df)>0:
+        x='year'
+        y='us_total_yield'
+        fig = px.scatter(df, x=x, y=y, text='year', trendline="ols")
+
+        all_models=px.get_trendline_results(fig).px_fit_results
+        model=all_models[0]
+        
+        add_today(fig=fig,df=df,x_col=x, y_col=y, size=10, color='red', symbol='star', name='Today', model=None) # add today
+        prediction = add_today(fig=fig,df=df,x_col=x, y_col=y, size=7, color='black', symbol='x', name='Model', model=model) # add prediction
+            
+        title='us total - '+y+' vs ' + x + ' - Prediction: ' + format(prediction,'.2f')
+        fig.update_traces(textposition="top center")
+        fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
+        fo.append({'state':'us total','fig':fig,'model':model, 'df':df})
+
+    # Yield vs Conditions Chart
+    if True and len(df)>0:
+        x='us_total_conditions'
+        y='us_total_yield'        
+        fig = px.scatter(df, x=x, y=y, text='year', trendline="ols")
+
+        all_models=px.get_trendline_results(fig).px_fit_results
+        model=all_models[0]
+        
+        add_today(fig=fig,df=df,x_col=x, y_col=y, size=10, color='red', symbol='star', name='Today', model=None) # add today
+        prediction = add_today(fig=fig,df=df,x_col=x, y_col=y, size=7, color='black', symbol='x', name='Model', model=model) # add prediction
+            
+        title='us total - '+y+' vs ' + x + ' - Prediction: ' + format(prediction,'.2f')
+        fig.update_traces(textposition="top center")
+        fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
+        fo.append({'state':'us total','fig':fig,'model':model, 'df':df})
+
+    # Delta Chart
+    df['Delta Yield'] = df['us_total_yield'].diff()
+    df['Delta Conditions'] = df['us_total_conditions'].diff()
+    df['Prev_Yield']=df['us_total_yield'].shift(1)
+    df = df.dropna() # because with Delta, the first one it is going to be NaN (as there is no previous year to the first one)
+    df=df.set_index('year',drop=False)
+    if True and len(df)>0:
+        x='Delta Conditions'
+        y='Delta Yield'
+        fig = px.scatter(df, x=x, y=y, text='year', trendline="ols")
+
+        all_models=px.get_trendline_results(fig).px_fit_results
+        model=all_models[0]
+        
+        add_today(fig=fig,df=df,x_col=x, y_col=y, size=10, color='red', symbol='star', name='Today', model=None) # add today
+        prediction = df['Prev_Yield'].values[-1]+ add_today(fig=fig,df=df,x_col=x, y_col=y, size=7, color='black', symbol='x', name='Model', model=model) # add prediction
+        
+        # As this is a delta chart, I need to add the previous year to the estimate
+
+        title='us total - '+y+' vs ' + x +' (YOY) ' + ' - Prediction: ' + format(prediction,'.2f')
+        fig.update_traces(textposition="top center")
+        fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
+        fo.append({'state':'us total','fig':fig,'model':model, 'df':df})
+    return fo
 
 # Utilities
 def last_leap_year():    
@@ -295,7 +349,7 @@ def Fit_Model(df, y_col: str, x_cols=[], exclude_from=None, extract_only=None):
 
     return fo
 
-def trend_yield(df_yield, start_year=None, n_years_min=20, rolling=False):
+def trend_yield(df_yield, start_year=None, n_years_min=20, rolling=False, yield_col='Value'):
     """
     'start_year'
         - start calculating the trend yield from this year
@@ -335,7 +389,7 @@ def trend_yield(df_yield, start_year=None, n_years_min=20, rolling=False):
 
         df_model=df_yield[mask]
         print(df_model)
-        model=Fit_Model(df_model,y_col='Value',x_cols=['year'])
+        model=Fit_Model(df_model,y_col=yield_col,x_cols=['year'])
         pred = predict_with_model(model,df_yield.loc[y:y])
 
         fo_dict['year'].append(y)
@@ -346,7 +400,7 @@ def trend_yield(df_yield, start_year=None, n_years_min=20, rolling=False):
 
     df=pd.concat([df_yield,df],axis=1,join='inner')
 
-    df=df.rename(columns={'Value':yield_str})
+    df=df.rename(columns={yield_col:yield_str})
     df[devia_str]=100.0*( df[yield_str]/df[trend_str]-1.0)
     df=df.set_index('year')
     return df

@@ -275,7 +275,7 @@ def get_USA_progress(commodity='CORN', progress_var=None, aggregate_level='NATIO
     aggregate_level=aggregate_level.upper()
 
     dl = QS_input()
-    dl.years.extend(years)    
+    dl.years.extend(years)
 
     if progress_var is not None:
         if ((progress_var.lower()=='pct harvested') & (commodity=='CORN')):
