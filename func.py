@@ -18,7 +18,6 @@ if True:
     commodities=['CORN','SOYBEANS','WHEAT, WINTER','WHEAT, SPRING, (EXCL DURUM)','WHEAT, SPRING, DURUM']    
     commodities=[t.title() for t in commodities]
 
-
 # Core Functions
 def get_progress_chart(commodity, state_name, progress_var, crop_year_start, hovermode):
 
@@ -70,52 +69,52 @@ def get_conditions_chart(df: pd.DataFrame, state_name:str, class_desc:str, hover
     fig.update_layout(hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
     return fig
 
-def get_CCI_yield_model_charts(dfs_conditions, dfs_yields, hovermode: str):
+def get_CCI_results_by_state(dfs_conditions, dfs_yields, hovermode: str):
     fo = []
     for state in dfs_conditions:
-        df = dfs_conditions[state][:]
-        df_yield = dfs_yields[state][:]
-        df_yield=df_yield[['year','Value']]
-        commodity=dfs_yields[state]['commodity_desc'].values[0] + ',' + dfs_yields[state]['class_desc'].values[0]
+        # Preliminaries
+        if True:
+            df = dfs_conditions[state][:]   
+            
+            df_yield = dfs_yields[[state.upper()]]
+            commodity=''
 
-        # Pivoting and Extending the df so to have all the years in the scatter plot
-        df = df.pivot(index='seas_day',columns='year',values='Value').fillna(method='ffill').fillna(method='bfill').melt(ignore_index=False)
-        df['seas_day']=df.index
-        df=df.rename(columns={'value':'Value'})
+            # Pivoting and Extending the df so to have all the years in the scatter plot
+            df = df.pivot(index='seas_day',columns='year',values='Value').fillna(method='ffill').fillna(method='bfill').melt(ignore_index=False)
+            df['seas_day']=df.index
+            df=df.rename(columns={'value':'Value'})
+            
+            last_year = int(df['year'].max())
+            if not last_year in df_yield.index:
+                lvi=df_yield.last_valid_index()
+                df_yield.loc[last_year] = df_yield.loc[lvi] # add row/index for the current year to be able to calculate the trend yield
+                df_yield['year']=df_yield.index # becuase otherwise 'year' is wrong
+                df_yield.loc[last_year] = trend_yield(df_yield, start_year=last_year, n_years_min=1000, rolling=False, yield_col=state.upper()).loc[last_year][['trend_yield']].values[0]
 
-        last_year = int(df['year'].max())
-        if not last_year in df_yield.index:
-            lvi=df_yield.last_valid_index()
-            df_yield.loc[last_year] = df_yield.loc[lvi] # add row/index for the current year to be able to calculate the trend yield
-            df_yield['year']=df_yield.index # becuase otherwise 'year' is wrong
-            df_yield.loc[last_year] =trend_yield(df_yield, start_year=last_year, n_years_min=1000, rolling=False).loc[last_year][['trend_yield']].values[0]
             df_yield['year']=df_yield.index
+            # Selecting the last available day overall
+            last_day = df.index[-1]
 
+            # Selecting the same day for each of the available years
+            mask= ((df.index.month==last_day.month) & (df.index.day==last_day.day))        
+            df = df[mask]
 
-        # Selecting the last available day overall
-        last_day = df.index[-1]
+            # Add the yield for each year to the 'condition df'
+            df = df.merge(df_yield, left_on='year', right_index=True,)
 
-        # Selecting the same day for each of the available years
-        mask= ((df.index.month==last_day.month) & (df.index.day==last_day.day))        
-        df = df[mask]
-
-        # Add the yield for each year to the 'condition df'
-        df = df.merge(df_yield, left_on='year', right_index=True,)
-
-        # Both 'Conditions' (right -> x) and 'Yield' are named 'Value', so after the merging it is necessary to rename
-        df=df.rename({'Value_x':'Conditions', 'Value_y':'Yield'}, axis=1)
-        df['Delta Yield'] = df['Yield'].diff()
-        df['Delta Conditions'] = df['Conditions'].diff()
-        df['Prev_Yield']=df['Yield'].shift(1)
-        df = df.dropna() # because with Delta, the first one it is going to be NaN (as there is no previous year to the first one)
-        df=df.set_index('year',drop=False)
+            df=df.rename({'Value':'Conditions', state.upper():'Yield'}, axis=1)
+            df['Delta Yield'] = df['Yield'].diff()
+            df['Delta Conditions'] = df['Conditions'].diff()
+            df['Prev_Yield']=df['Yield'].shift(1)
+            df = df.dropna() # because with Delta, the first one it is going to be NaN (as there is no previous year to the first one)
+            df=df.set_index('year',drop=False)
                 
-        # Historical Yield
+        # Historical Yield        
         if True and len(df)>0:
+            analysis='hist'
             x='year'
-            y='Value'
-            # st.write(df_yield)
-            # mask=df_yield.index<2023
+            y=state.upper()
+
             fig = px.scatter(df_yield, x=x, y=y, text='year', trendline="ols")
 
             all_models=px.get_trendline_results(fig).px_fit_results
@@ -127,10 +126,11 @@ def get_CCI_yield_model_charts(dfs_conditions, dfs_yields, hovermode: str):
             title=state +' - ' + commodity + ' - '+y+' vs ' + x + ' - Prediction: ' + format(prediction,'.2f')
             fig.update_traces(textposition="top center")
             fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
-            fo.append({'state':state,'fig':fig,'model':model, 'df':df})
+            fo.append({'state':state,'analysis':analysis, 'fig':fig,'model':model, 'df':df, 'prediction':prediction})
 
         # Yield vs Conditions Chart
         if False and len(df)>0:
+            analysis='cond'
             x='Conditions'
             y='Yield'
             fig = px.scatter(df, x=x, y=y, text='year', trendline="ols")
@@ -144,10 +144,11 @@ def get_CCI_yield_model_charts(dfs_conditions, dfs_yields, hovermode: str):
             title=state +' - ' + commodity + ' - '+y+' vs ' + x + ' - Prediction: ' + format(prediction,'.2f')
             fig.update_traces(textposition="top center")
             fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
-            fo.append({'state':state,'fig':fig,'model':model, 'df':df})
+            fo.append({'state':state,'analysis':analysis, 'fig':fig,'model':model, 'df':df, 'prediction':prediction})
 
         # Delta Chart
         if True and len(df)>0:
+            analysis='delta'
             x='Delta Conditions'
             y='Delta Yield'
             fig = px.scatter(df, x=x, y=y, text='year', trendline="ols")
@@ -163,11 +164,11 @@ def get_CCI_yield_model_charts(dfs_conditions, dfs_yields, hovermode: str):
             title=state +' - ' + commodity + ' - '+y+' vs ' + x +' (YOY) ' + ' - Prediction: ' + format(prediction,'.2f')
             fig.update_traces(textposition="top center")
             fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
-            fo.append({'state':state,'fig':fig,'model':model, 'df':df})
+            fo.append({'state':state,'analysis':analysis, 'fig':fig,'model':model, 'df':df, 'prediction':prediction})
 
     return fo
 
-def get_CCI_us_total(df,hovermode: str):
+def get_CCI_results_us_total(df, hovermode: str):
     fo = []
     df['year']=df.index
 
@@ -176,6 +177,7 @@ def get_CCI_us_total(df,hovermode: str):
 
     # Historical Yield
     if True and len(df)>0:
+        analysis='hist'
         x='year'
         y='us_total_yield'
         fig = px.scatter(df, x=x, y=y, text='year', trendline="ols")
@@ -189,10 +191,11 @@ def get_CCI_us_total(df,hovermode: str):
         title='us total - '+y+' vs ' + x + ' - Prediction: ' + format(prediction,'.2f')
         fig.update_traces(textposition="top center")
         fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
-        fo.append({'state':'us total','fig':fig,'model':model, 'df':df})
+        fo.append({'state':'us total','analysis':analysis, 'fig':fig,'model':model, 'df':df, 'prediction':prediction})
 
     # Yield vs Conditions Chart
-    if True and len(df)>0:
+    if False and len(df)>0:
+        analysis='cond'
         x='us_total_conditions'
         y='us_total_yield'        
         fig = px.scatter(df, x=x, y=y, text='year', trendline="ols")
@@ -206,34 +209,51 @@ def get_CCI_us_total(df,hovermode: str):
         title='us total - '+y+' vs ' + x + ' - Prediction: ' + format(prediction,'.2f')
         fig.update_traces(textposition="top center")
         fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
-        fo.append({'state':'us total','fig':fig,'model':model, 'df':df})
+        fo.append({'state':'us total','analysis':analysis, 'fig':fig,'model':model, 'df':df, 'prediction':prediction})
 
     # Delta Chart
-    df['Delta Yield'] = df['us_total_yield'].diff()
-    df['Delta Conditions'] = df['us_total_conditions'].diff()
-    df['Prev_Yield']=df['us_total_yield'].shift(1)
-    df = df.dropna() # because with Delta, the first one it is going to be NaN (as there is no previous year to the first one)
-    df=df.set_index('year',drop=False)
     if True and len(df)>0:
+        analysis='delta'
+
+        # Calculate the 'Delta' Variables
+        df['Delta Yield'] = df['us_total_yield'].diff()
+        df['Delta Conditions'] = df['us_total_conditions'].diff()
+        df['Prev_Yield']=df['us_total_yield'].shift(1)
+        df = df.dropna() # because with Delta, the first one it is going to be NaN (as there is no previous year to the first one)
+        df=df.set_index('year',drop=False)
+        
+        # Create the chart
         x='Delta Conditions'
         y='Delta Yield'
         fig = px.scatter(df, x=x, y=y, text='year', trendline="ols")
 
         all_models=px.get_trendline_results(fig).px_fit_results
-        model=all_models[0]
-        
+        model=all_models[0]        
         add_today(fig=fig,df=df,x_col=x, y_col=y, size=10, color='red', symbol='star', name='Today', model=None) # add today
-        prediction = df['Prev_Yield'].values[-1]+ add_today(fig=fig,df=df,x_col=x, y_col=y, size=7, color='black', symbol='x', name='Model', model=model) # add prediction
-        
-        # As this is a delta chart, I need to add the previous year to the estimate
 
+        # As this is a delta chart, I need to add the previous year to the estimate
+        prediction = add_today(fig=fig,df=df,x_col=x, y_col=y, size=7, color='black', symbol='x', name='Model', model=model) # add prediction
+        prediction = prediction+df['Prev_Yield'].values[-1]
+                
         title='us total - '+y+' vs ' + x +' (YOY) ' + ' - Prediction: ' + format(prediction,'.2f')
         fig.update_traces(textposition="top center")
         fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
-        fo.append({'state':'us total','fig':fig,'model':model, 'df':df})
+        fo.append({'state':'us total','analysis':analysis, 'fig':fig,'model':model, 'df':df, 'prediction':prediction})
     return fo
 
 # Utilities
+def add_estimate(df, year_to_estimate, how='mean', last_n_years=5, normalize=False, overwrite=False):
+    if (overwrite) or (year_to_estimate not in df.index):
+        if how=='mean':
+            mask=(df.index>=year_to_estimate-last_n_years)
+            mean=df[mask].mean()
+
+        if normalize:
+            df.loc[year_to_estimate]=mean/mean.sum()
+        else:
+            df.loc[year_to_estimate]=mean    
+    return df
+
 def last_leap_year():    
     start=dt.today().year
     while(True):
@@ -369,8 +389,14 @@ def trend_yield(df_yield, start_year=None, n_years_min=20, rolling=False, yield_
     trend_str='trend_yield'
     devia_str='yield_deviation'
 
-    if df_yield.index.name != 'year':
-        df_yield=df_yield.set_index('year',drop=False)
+    print(df_yield.index.name)
+    print(df_yield.index)
+    print(df_yield['year'])
+
+    # if df_yield.index.name != 'year':
+    #     df_yield=df_yield.set_index('year',drop=False)
+
+    df_yield=df_yield.set_index('year',drop=False)
 
     year_min=int(df_yield.index.min())
     year_max=int(df_yield.index.max())
