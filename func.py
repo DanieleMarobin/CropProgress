@@ -15,7 +15,13 @@ import streamlit as st
 if True:
     charts_height = 850
 
-    commodities=['CORN','SOYBEANS','WHEAT, WINTER','WHEAT, SPRING, (EXCL DURUM)','WHEAT, SPRING, DURUM']    
+    commodities=['CORN',
+                 'SOYBEANS',
+                 'WHEAT, WINTER',
+                 'WHEAT, WINTER, RED, HARD',
+                 'WHEAT, WINTER, RED, SOFT',
+                 'WHEAT, SPRING, (EXCL DURUM)',
+                 'WHEAT, SPRING, DURUM']    
     commodities=[t.title() for t in commodities]
 
 # Core Functions
@@ -52,39 +58,42 @@ def get_progress_chart(commodity, state_name, progress_var, crop_year_start, hov
     fig.update_layout(hovermode=hovermode, width=1000, height=1000, xaxis=dict(tickformat="%b %d"))
     return fig
 
-def get_conditions_chart(df: pd.DataFrame, state_name:str, class_desc:str, hovermode: str):
+def get_conditions_chart(df, state_name, class_desc, hovermode, col='Value'):
     last_year = df['year'].max()
     title_text = state_name + ' - ' + class_desc +' GE Conditions'
 
     mask=df['year']<last_year-1
-    fig = px.line(df[mask], x='seas_day', y='Value', color='year', title=title_text, color_discrete_sequence=px.colors.qualitative.Plotly)
+    fig = px.line(df[mask], x='seas_day', y=col, color='year', title=title_text, color_discrete_sequence=px.colors.qualitative.Plotly)
     fig.update_traces(line=dict(width=1))
 
     mask=df['year']==last_year-1
-    fig.add_trace(go.Scatter(x=df[mask]['seas_day'], y=df[mask]['Value'],fill=None, mode='lines', name=str(last_year-1),text=str(last_year), line=dict(color='black', width=3)))
+    fig.add_trace(go.Scatter(x=df[mask]['seas_day'], y=df[mask][col],fill=None, mode='lines', name=str(last_year-1),text=str(last_year), line=dict(color='black', width=3)))
 
     mask=df['year']==last_year
-    fig.add_trace(go.Scatter(x=df[mask]['seas_day'], y=df[mask]['Value'],fill=None, mode='lines', name=str(last_year), text=str(last_year), line=dict(color='red', width=4)))
+    fig.add_trace(go.Scatter(x=df[mask]['seas_day'], y=df[mask][col],fill=None, mode='lines', name=str(last_year), text=str(last_year), line=dict(color='red', width=4)))
 
     fig.update_layout(hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
     return fig
 
-def get_CCI_results_by_state(dfs_conditions, dfs_yields, hovermode: str):
+def get_CCI_results(dfs_conditions, dfs_yields, hovermode: str):
     fo = []
     for state in dfs_conditions:
         # Preliminaries
         if True:
             df = dfs_conditions[state][:]   
             
-            df_yield = dfs_yields[[state.upper()]]
+            df_yield = dfs_yields[[state.upper()]].dropna() # this is for the hole in the by-class data
             commodity=''
 
             # Pivoting and Extending the df so to have all the years in the scatter plot
             df = df.pivot(index='seas_day',columns='year',values='Value').fillna(method='ffill').fillna(method='bfill').melt(ignore_index=False)
             df['seas_day']=df.index
-            df=df.rename(columns={'value':'Value'})
-            
+            df=df.rename(columns={'value':'Value'})                
+
+            # Last Year calculated from the conditions
             last_year = int(df['year'].max())
+
+            # If there is no estimate for the Yield, add the trend Yield
             if not last_year in df_yield.index:
                 lvi=df_yield.last_valid_index()
                 df_yield.loc[last_year] = df_yield.loc[lvi] # add row/index for the current year to be able to calculate the trend yield
@@ -92,7 +101,7 @@ def get_CCI_results_by_state(dfs_conditions, dfs_yields, hovermode: str):
                 df_yield.loc[last_year] = trend_yield(df_yield, start_year=last_year, n_years_min=1000, rolling=False, yield_col=state.upper()).loc[last_year][['trend_yield']].values[0]
 
             df_yield['year']=df_yield.index
-            # Selecting the last available day overall
+            # WIP: Selecting the last available day overall (change here! Because after filling, the last day overall is the end of the season!)
             last_day = df.index[-1]
 
             # Selecting the same day for each of the available years
@@ -116,20 +125,20 @@ def get_CCI_results_by_state(dfs_conditions, dfs_yields, hovermode: str):
             y=state.upper()
 
             fig = px.scatter(df_yield, x=x, y=y, text='year', trendline="ols")
-
+            
             all_models=px.get_trendline_results(fig).px_fit_results
             model=all_models[0]
-            
-            add_today(fig=fig,df=df_yield,x_col=x, y_col=y, size=10, color='red', symbol='star', name='Today', model=None) # add today
+
+            add_today(fig=fig,df=df_yield,x_col=x, y_col=y, size=10, color='red', symbol='star', name='Most Recent Data', model=None) # add today
             prediction = add_today(fig=fig,df=df_yield,x_col=x, y_col=y, size=7, color='black', symbol='x', name='Model', model=model) # add prediction
                 
             title=state +' - ' + commodity + ' - '+y+' vs ' + x + ' - Prediction: ' + format(prediction,'.2f')
             fig.update_traces(textposition="top center")
             fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
-            fo.append({'state':state,'analysis':analysis, 'fig':fig,'model':model, 'df':df, 'prediction':prediction})
+            fo.insert(0,{'state':state,'analysis':analysis, 'fig':fig,'model':model, 'df':df_yield, 'prediction':prediction})
 
         # Yield vs Conditions Chart
-        if False and len(df)>0:
+        if True and len(df)>0:
             analysis='cond'
             x='Conditions'
             y='Yield'
@@ -138,13 +147,13 @@ def get_CCI_results_by_state(dfs_conditions, dfs_yields, hovermode: str):
             all_models=px.get_trendline_results(fig).px_fit_results
             model=all_models[0]
             
-            add_today(fig=fig,df=df,x_col=x, y_col=y, size=10, color='red', symbol='star', name='Today', model=None) # add today
+            add_today(fig=fig,df=df,x_col=x, y_col=y, size=10, color='red', symbol='star', name='Most Recent Data', model=None) # add today
             prediction = add_today(fig=fig,df=df,x_col=x, y_col=y, size=7, color='black', symbol='x', name='Model', model=model) # add prediction
                 
             title=state +' - ' + commodity + ' - '+y+' vs ' + x + ' - Prediction: ' + format(prediction,'.2f')
             fig.update_traces(textposition="top center")
             fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
-            fo.append({'state':state,'analysis':analysis, 'fig':fig,'model':model, 'df':df, 'prediction':prediction})
+            fo.insert(0,{'state':state,'analysis':analysis, 'fig':fig,'model':model, 'df':df, 'prediction':prediction})
 
         # Delta Chart
         if True and len(df)>0:
@@ -156,15 +165,14 @@ def get_CCI_results_by_state(dfs_conditions, dfs_yields, hovermode: str):
             all_models=px.get_trendline_results(fig).px_fit_results
             model=all_models[0]
             
-            add_today(fig=fig,df=df,x_col=x, y_col=y, size=10, color='red', symbol='star', name='Today', model=None) # add today
+            add_today(fig=fig,df=df,x_col=x, y_col=y, size=10, color='red', symbol='star', name='Most Recent Data', model=None) # add today
             prediction = df['Prev_Yield'].values[-1]+ add_today(fig=fig,df=df,x_col=x, y_col=y, size=7, color='black', symbol='x', name='Model', model=model) # add prediction
             
             # As this is a delta chart, I need to add the previous year to the estimate
-
             title=state +' - ' + commodity + ' - '+y+' vs ' + x +' (YOY) ' + ' - Prediction: ' + format(prediction,'.2f')
             fig.update_traces(textposition="top center")
             fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
-            fo.append({'state':state,'analysis':analysis, 'fig':fig,'model':model, 'df':df, 'prediction':prediction})
+            fo.insert(0,{'state':state,'analysis':analysis, 'fig':fig,'model':model, 'df':df, 'prediction':prediction})
 
     return fo
 
@@ -194,7 +202,7 @@ def get_CCI_results_us_total(df, hovermode: str):
         fo.append({'state':'us total','analysis':analysis, 'fig':fig,'model':model, 'df':df, 'prediction':prediction})
 
     # Yield vs Conditions Chart
-    if False and len(df)>0:
+    if True and len(df)>0:
         analysis='cond'
         x='us_total_conditions'
         y='us_total_yield'        
@@ -310,27 +318,6 @@ def add_today(fig, df, x_col, y_col, today_idx=None, size=10, color='red', symbo
     hovertemplate="<br>".join([name, y_str, x_str, "<extra></extra>"])
     fig.add_trace(go.Scatter(name=name,x=[x], y=[y], mode = 'markers', marker_symbol = symbol,marker_size = size, marker_color=color, hovertemplate=hovertemplate), row=row, col=col)
     return y
-
-def inside_yearly_interpolation(df, col_year):
-    """
-    Important:
-        - I normally pass a very simple df, with year and value and a time index
-        - it is important because at the end it just interpolates
-        - as it is done on an yearly basis, the year col is going to remain a constant
-        - the rest needs to be paid attention to
-
-    the idea is to recreate a new Dataframe by concatenating the yearly interpolated ones
-    so there is no risk of interpolating from the end of a crop year to the beginning of the next one
-    """
-    dfs=[]
-    years=np.sort(df[col_year].unique())
-
-    for y in years:
-        mask=(df[col_year]==y)
-
-        dfs.append(df[mask].resample('1d').asfreq().interpolate())
-    
-    return pd.concat(dfs)
 
 def predict_with_model(model, pred_df):
     if (('const' in model.params) & ('const' not in pred_df.columns)):

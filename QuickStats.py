@@ -9,7 +9,36 @@ import concurrent.futures
 from datetime import datetime as dt
 from calendar import isleap
 
+# 'Public variables'
+if True:
+    wheat_by_class={
+        'WHEAT, WINTER, RED, HARD':'WHEAT, WINTER',
+        'WHEAT, WINTER, RED, SOFT':'WHEAT, WINTER',
+        'WHEAT, WINTER, WHITE, HARD':'WHEAT, WINTER',
+        'WHEAT, WINTER, WHITE, SOFT':'WHEAT, WINTER',
+        'WHEAT, WINTER, WHITE':'WHEAT, WINTER',
+
+        'WHEAT, SPRING, RED, HARD':'WHEAT, WINTER',
+        # 'WHEAT, SPRING, RED, SOFT':'WHEAT, WINTER', # Doesn't exist
+        'WHEAT, SPRING, WHITE, HARD':'WHEAT, WINTER',
+        'WHEAT, SPRING, WHITE, SOFT':'WHEAT, WINTER',
+        'WHEAT, SPRING, WHITE':'WHEAT, WINTER',        
+    }
+        
+    qs_tc = {'CORN': 9,'Daniele': 10}
+
 # Utilities
+def add_estimate(df, year_to_estimate, how='mean', last_n_years=5, normalize=False, overwrite=False):
+    if (overwrite) or (year_to_estimate not in df.index):
+        if how=='mean':
+            mask=(df.index>=year_to_estimate-last_n_years)
+            mean=df[mask].mean()
+
+        if normalize:
+            df.loc[year_to_estimate]=mean/mean.sum()
+        else:
+            df.loc[year_to_estimate]=mean    
+    return df
 def last_leap_year():    
     start=dt.today().year
     while(True):
@@ -42,10 +71,11 @@ def seas_day(date, ref_year_start= dt.today()):
         else:
             return dt(LLY, date.month, date.day)
 
-def inside_yearly_interpolation(df, col_year):
+def yearly_interpolation(df, col_year='year', fill_forward=False, fill_backward=False):
     """
     Important:
         - I normally pass a very simple df, with year and value and a time index
+        - df MUST have a time index because it will 'df[mask].resample('1d').asfreq().interpolate()'
         - it is important because at the end it just interpolates
         - as it is done on an yearly basis, the year col is going to remain a constant
         - the rest needs to be paid attention to
@@ -54,18 +84,22 @@ def inside_yearly_interpolation(df, col_year):
     so there is no risk of interpolating from the end of a crop year to the beginning of the next one
     """
     dfs=[]
+
     years=np.sort(df[col_year].unique())
 
     for y in years:
         mask=(df[col_year]==y)
+        temp=df[mask].resample('1d').asfreq().interpolate()
 
-        dfs.append(df[mask].resample('1d').asfreq().interpolate())
+        if fill_forward:
+            temp=temp.fillna(method='ffill')
+
+        if fill_backward:
+            temp=temp.fillna(method='bfill')
+
+        dfs.append(temp)
     
     return pd.concat(dfs)
-
-# 'Time Conversion' dictionary
-if True:
-    qs_tc = {'CORN': 9,'Daniele': 10}
 
 class QS_input():
     def __init__(self):
@@ -174,17 +208,24 @@ def get_USA_conditions_parallel(commodity='CORN', aggregate_level='STATE', state
 
     return dfs
 
-def extract_GE_conditions(df):
-    crop_year_start=dt(dt.today().year,1,1)
+def extract_GE_conditions(df, crop_year_start):
+    '''
+    the output is a daily table created with 'yearly_interpolation':
+        -> so it is done properly
+        -> index is the actual day
+        -> output columns are 'year', 'seas_day' (for the chart), 'Value' (GE = good + excellent)
+    '''
 
     df[['year', 'Value']] = df[['year', 'Value']].astype(int)
     df['week_ending'] = pd.to_datetime(df['week_ending'])
 
     if 'WHEAT, WINTER' in df['short_desc'].values[0]:
-        crop_year_start=dt(dt.today().year,9,1)
-        # the below 2 are to correct USDA wrong data
-        mask=(df['week_ending'].dt.month>crop_year_start.month) & (df['week_ending'].dt.year>=df['year'])
-        df.loc[mask,'year']=df['week_ending'].dt.year+1                
+        # the below lines are to correct USDA wrong data
+        mask=(df['week_ending'].dt.month>=crop_year_start.month) & (df['week_ending'].dt.year>=df['year'])
+        df.loc[mask,'year']=df['week_ending'].dt.year+1
+
+        mask=(df['week_ending'].dt.month<crop_year_start.month) & (df['week_ending'].dt.year<df['year'])
+        df.loc[mask,'year']=df['week_ending'].dt.year
 
     mask=df['unit_desc'].isin(['PCT EXCELLENT', 'PCT GOOD'])
     df = df[mask].groupby(['year', 'week_ending'], as_index=False).agg({'Value': 'sum'})
@@ -192,9 +233,10 @@ def extract_GE_conditions(df):
     mask=(df['Value']>0) # this to drop the 0s 
     df=df[mask]
     df=df.set_index('week_ending')    
-    df=inside_yearly_interpolation(df,'year')
+    df=yearly_interpolation(df,'year')
     df=add_seas_day(df, crop_year_start)
     return df
+
 def get_USA_yields(commodity='CORN', aggregate_level='NATIONAL', state_name=[], years=[], cols_subset=[]):
     """
     simple use:
@@ -301,9 +343,15 @@ def get_USA_production(commodity='CORN', aggregate_level='NATIONAL', state_name=
 
     commodity = 'CORN', 'SOYBEANS'\n
     aggregate_level = 'NATIONAL', 'STATE', 'COUNTY'
-    """    
+    """
+    
     commodity=commodity.upper()
     aggregate_level=aggregate_level.upper()
+
+    by_class_split=[]
+    if (aggregate_level=='STATE') and (commodity in wheat_by_class):
+        by_class_split=get_USA_prod_pct_by_type(commodity=commodity,aggregate_level=aggregate_level)
+        commodity=wheat_by_class[commodity]
 
     dl = QS_input()
     dl.source_desc.append('SURVEY')
@@ -321,12 +369,26 @@ def get_USA_production(commodity='CORN', aggregate_level='NATIONAL', state_name=
     dl.state_name.extend(state_name)
 
     fo=get_data(dl)
+
+    # purely production
     if len(cols_subset)>0: fo = fo[cols_subset]
     fo=fo.sort_values(by='year',ascending=True)
     fo['Value'] = fo['Value'].str.replace(',','').astype(float)
 
+    # Adding the by-class split
+    if len(by_class_split)>0:
+        fo=pd.concat([fo,by_class_split])
+        fo=fo.groupby(by=['year','state_name']).agg({'Value': ['prod', 'count']})
+        fo.columns=fo.columns.droplevel(level=0)
+
+        mask=(fo['count']==2)
+
+        fo=fo[mask]
+        fo=fo.drop(columns='count')
+        fo=fo.rename(columns={'prod':'Value'})
+
     return fo
-def get_USA_prod_weights(commodity='CORN', aggregate_level='STATE',state_name=[], years=[], subset=[], pivot_column='state_name', output='%'):
+def get_USA_prod_weights(commodity='CORN', aggregate_level='STATE',state_name=[], years=[], pivot_column='state_name', output='%'):
     # pivot_column= 'state_name', 'state_alpha'
     # rows:       years
     # columns:    region
@@ -334,23 +396,50 @@ def get_USA_prod_weights(commodity='CORN', aggregate_level='STATE',state_name=[]
     fo=get_USA_production(commodity=commodity,aggregate_level=aggregate_level,state_name=state_name, years=years)
     fo = pd.pivot_table(fo,values='Value',index=pivot_column,columns='year')
 
-    if (len(subset))>0:
-        fo=fo.loc[subset]
-
     if output=='%':
         fo=fo/fo.sum()
 
     return fo.T
-
-def get_USA_area_planted(commodity='CORN', aggregate_level='NATIONAL', state_name=[], years=[], cols_subset=[]):
+def get_USA_prod_pct_by_type(commodity='WHEAT, WINTER, RED, HARD', aggregate_level='STATE', state_name=[], years=[], cols_subset=[]):
     """
-    df_prod=qs.get_QS_production('soybeans', aggregate_level='STATE', years=[2017])\n
-
-    commodity = 'CORN', 'SOYBEANS'\n
-    aggregate_level = 'NATIONAL', 'STATE', 'COUNTY'
+    This is used because QuickStats doesn't give state-by-state the by-class production of HRW, SRW
+    QuickStats only gives the national production or the % by type per state
     """    
     commodity=commodity.upper()
     aggregate_level=aggregate_level.upper()
+
+    dl = QS_input()
+    dl.source_desc.append('SURVEY')
+    dl.years.extend(years)
+    dl.short_desc=[commodity+' - PRODUCTION, MEASURED IN PCT BY TYPE']
+
+    if commodity=='CORN':
+        dl.short_desc=[commodity+', GRAIN - PRODUCTION, MEASURED IN PCT BY TYPE']
+    elif 'WHEAT' in commodity:
+        commodity='WHEAT'
+
+    dl.commodity_desc.append(commodity)
+    # dl.reference_period_desc.append('YEAR') # This can also be: "YEAR - AUG FORECAST"
+    dl.agg_level_desc.append(aggregate_level)
+    dl.state_name.extend(state_name)
+
+    fo=get_data(dl)
+    if len(cols_subset)>0: fo = fo[cols_subset]
+    fo=fo.sort_values(by='year',ascending=True)
+    # fo['Value'] = fo['Value'].str.replace(',','').astype(float)
+    fo['Value'] = fo['Value'].astype(float)/100.0    
+    return fo
+
+def get_USA_area_planted(commodity='CORN', aggregate_level='NATIONAL', state_name=[], years=[], cols_subset=[], pivot_column='state_name', n_years_estimate_by_class = -1):
+    """
+    """    
+    commodity=commodity.upper()
+    aggregate_level=aggregate_level.upper()
+
+    by_class_split=[]
+    if (aggregate_level=='STATE') and (commodity in wheat_by_class):
+        by_class_split=get_USA_prod_pct_by_type(commodity=commodity,aggregate_level=aggregate_level)
+        commodity=wheat_by_class[commodity]
 
     dl = QS_input()
     dl.source_desc.append('SURVEY')
@@ -373,17 +462,30 @@ def get_USA_area_planted(commodity='CORN', aggregate_level='NATIONAL', state_nam
     fo=fo.sort_values(by='year',ascending=True)
     fo['Value'] = fo['Value'].str.replace(',','').astype(float)
 
+    # Adding the by-class split
+    if len(by_class_split)>0:
+        # pivoting both ingredients
+        by_class_split=pd.pivot_table(by_class_split,values='Value',index='year',columns=pivot_column)
+        fo=pd.pivot_table(fo,values='Value',index='year',columns=pivot_column)
+
+        # in case the variable has more years than the by-class production split: 
+        #       - for example planting data is available before production: so we cannot have the production split for a certain year
+        if n_years_estimate_by_class>0:
+            last_available_year= max(fo.index)
+            by_class_split=add_estimate(by_class_split, year_to_estimate=last_available_year, last_n_years=n_years_estimate_by_class, overwrite=False)
+
+        fo=fo*by_class_split
+        fo=fo.melt(ignore_index=False)
+        fo=fo.rename(columns={'value':'Value'})
+
     return fo
-def get_USA_area_planted_weights(commodity='CORN', aggregate_level='STATE',state_name=[], years=[], subset=[], pivot_column='state_name', output='%'):
+def get_USA_area_planted_weights(commodity='CORN', aggregate_level='NATIONAL', state_name=[], years=[], pivot_column='state_name', n_years_estimate_by_class = -1, output='%'):
     # pivot_column= 'state_name', 'state_alpha'
     # rows:       years
     # columns:    region
     
-    fo=get_USA_area_planted(commodity=commodity,aggregate_level=aggregate_level,state_name=state_name, years=years)
+    fo=get_USA_area_planted(commodity=commodity,aggregate_level=aggregate_level,state_name=state_name, years=years, n_years_estimate_by_class=n_years_estimate_by_class)
     fo = pd.pivot_table(fo,values='Value',index=pivot_column,columns='year')
-
-    if (len(subset))>0:
-        fo=fo.loc[subset]
 
     if output=='%':
         fo=fo/fo.sum()
@@ -399,6 +501,11 @@ def get_USA_area_harvested(commodity='CORN', aggregate_level='NATIONAL', state_n
     """    
     commodity=commodity.upper()
     aggregate_level=aggregate_level.upper()
+
+    by_class_split=[]
+    if (aggregate_level=='STATE') and (commodity in wheat_by_class):
+        by_class_split=get_USA_prod_pct_by_type(commodity=commodity,aggregate_level=aggregate_level)
+        commodity=wheat_by_class[commodity]
 
     dl = QS_input()
     dl.source_desc.append('SURVEY')
@@ -421,17 +528,26 @@ def get_USA_area_harvested(commodity='CORN', aggregate_level='NATIONAL', state_n
     fo=fo.sort_values(by='year',ascending=True)
     fo['Value'] = fo['Value'].str.replace(',','').astype(float)
 
+    # Adding the by-class split
+    if len(by_class_split)>0:
+        fo=pd.concat([fo,by_class_split])
+        fo=fo.groupby(by=['year','state_name']).agg({'Value': ['prod', 'count']})
+        fo.columns=fo.columns.droplevel(level=0)
+
+        mask=(fo['count']==2)
+
+        fo=fo[mask]
+        fo=fo.drop(columns='count')
+        fo=fo.rename(columns={'prod':'Value'})
+        
     return fo
-def get_USA_area_harvested_weights(commodity='CORN', aggregate_level='STATE',state_name=[], years=[], subset=[], pivot_column='state_name', output='%'):
+def get_USA_area_harvested_weights(commodity='CORN', aggregate_level='STATE',state_name=[], years=[], pivot_column='state_name', output='%'):
     # pivot_column= 'state_name', 'state_alpha'
     # rows:       years
     # columns:    region
     
     fo=get_USA_area_harvested(commodity=commodity,aggregate_level=aggregate_level,state_name=state_name, years=years)
     fo = pd.pivot_table(fo,values='Value',index=pivot_column,columns='year')
-
-    if (len(subset))>0:
-        fo=fo.loc[subset]
 
     if output=='%':
         fo=fo/fo.sum()
