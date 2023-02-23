@@ -47,8 +47,8 @@ with st.sidebar:
         options_states=['US Total'] + options_states # Because USDA doesn' provide National numbers for 'WHEAT, SPRING, DURUM'
 
     state = st.selectbox("State", options_states)
-    if 'US Total' in options_states:
-        state='US Total'
+    # if 'US Total' in options_states:
+    #     state='US Total'
 
     hovermode = st.selectbox('Hovermode',['x', 'y', 'closest', 'x unified', 'y unified'],index=2)
 
