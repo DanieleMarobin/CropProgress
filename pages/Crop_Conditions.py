@@ -47,10 +47,11 @@ with st.sidebar:
         options_states=['US Total'] + options_states # Because USDA doesn' provide National numbers for 'WHEAT, SPRING, DURUM'
 
     state = st.selectbox("State", options_states)
-    # if 'US Total' in options_states:
-    #     state='US Total'
 
-    hovermode = st.selectbox('Hovermode',['x', 'y', 'closest', 'x unified', 'y unified'],index=2)
+    # hovermode = st.selectbox('Hovermode',['x', 'y', 'closest', 'x unified', 'y unified'],index=2)
+    hovermode = 'closest'
+
+    n_years_for_trend = st.number_input('Years for Trend Calculation',1,200,20,5)
 
     TOTAL_US_DM=False
     if state=='US Total':
@@ -107,7 +108,12 @@ if True:
     for state, df in dfs_conditions.items():
         dfs_GE[state]=qs.extract_GE_conditions(df, crop_year_start)
 
-    CCI_results = fu.get_CCI_results(dfs_GE, df_yields, hovermode=hovermode)
+    if len(dfs_GE)>1:
+        rsq_analysis=False
+    else:
+        rsq_analysis=True
+
+    CCI_results = fu.get_CCI_results(dfs_GE, df_yields, crop_year_start=crop_year_start,  hovermode=hovermode, n_years_for_trend=n_years_for_trend, rsq_analysis=rsq_analysis)
 
 # 'Home made' US total calculation
 if TOTAL_US_DM:    
@@ -193,7 +199,7 @@ if TOTAL_US_DM:
 
 
     # Calculating the CCI Results
-    CCI_results = fu.get_CCI_results(dfs_GE, df_yields, hovermode=hovermode)
+    CCI_results = fu.get_CCI_results(dfs_GE, df_yields,crop_year_start=crop_year_start, hovermode=hovermode, n_years_for_trend=n_years_for_trend, rsq_analysis=True)
 
     with st.expander('Calculation Data Details'):
         st.write('all_conditions_raw',all_conditions_raw.sort_index(ascending=False))
@@ -237,7 +243,8 @@ if True:
             st.plotly_chart(fu.get_conditions_chart(dfs_GE[state], state, commodity, hovermode=hovermode), use_container_width=True)
             already_plot.append(state)
 
-        st.plotly_chart(f['fig'], use_container_width=True)        
-        with st.expander(state + ' - Model Details'):
+        st.plotly_chart(f['fig'], use_container_width=True)
+        with st.expander(state + ' - Details'):
             st.dataframe(f['df'].sort_index(ascending=False))
-            st.write(f['model'].summary())
+            if f['model'] is not None:
+                st.write(f['model'].summary())
