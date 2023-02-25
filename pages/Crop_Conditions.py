@@ -5,6 +5,7 @@ import QuickStats as qs
 import func as fu
 
 # Declarations and preliminaries
+crop_to_estimate=2023
 if True:
     if 'crop_conditions' not in st.session_state:
         st.session_state['crop_conditions']={}  
@@ -113,7 +114,7 @@ if True:
     else:
         rsq_analysis=True
 
-    CCI_results = fu.get_CCI_results(dfs_GE, df_yields, crop_year_start=crop_year_start,  hovermode=hovermode, n_years_for_trend=n_years_for_trend, rsq_analysis=rsq_analysis)
+    CCI_results = fu.get_CCI_results(crop_to_estimate, dfs_GE, df_yields, crop_year_start=crop_year_start,  hovermode=hovermode, n_years_for_trend=n_years_for_trend, rsq_analysis=rsq_analysis)
 
 # 'Home made' US total calculation
 if TOTAL_US_DM:    
@@ -198,7 +199,7 @@ if TOTAL_US_DM:
         df_yields=df_yields[~mask]
 
     # Calculating the CCI Results
-    CCI_results = fu.get_CCI_results(dfs_GE, df_yields,crop_year_start=crop_year_start, hovermode=hovermode, n_years_for_trend=n_years_for_trend, rsq_analysis=True)
+    CCI_results = fu.get_CCI_results(crop_to_estimate, dfs_GE, df_yields,crop_year_start=crop_year_start, hovermode=hovermode, n_years_for_trend=n_years_for_trend, rsq_analysis=True)
 
     with st.expander('Calculation Data Details'):
         st.write('all_conditions_raw',all_conditions_raw.sort_index(ascending=False))
