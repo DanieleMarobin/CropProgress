@@ -197,7 +197,6 @@ if TOTAL_US_DM:
         mask=(df_yields.index.duplicated(keep='first'))
         df_yields=df_yields[~mask]
 
-
     # Calculating the CCI Results
     CCI_results = fu.get_CCI_results(dfs_GE, df_yields,crop_year_start=crop_year_start, hovermode=hovermode, n_years_for_trend=n_years_for_trend, rsq_analysis=True)
 

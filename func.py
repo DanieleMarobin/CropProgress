@@ -80,10 +80,12 @@ def get_CCI_results(dfs_conditions, dfs_yields, hovermode, n_years_for_trend, cr
     for state in dfs_conditions:
         # Preliminaries
         if True:
+            commodity=''
+            trend_yield_value=-1
+            end_season_condition=None
             df = dfs_conditions[state][:]   
             
-            df_yield = dfs_yields[[state.upper()]].dropna() # this is for the hole in the by-class data
-            commodity=''
+            df_yield = dfs_yields[[state.upper()]].dropna() # this is for the hole in the by-class data            
             
             last_day_data = df.index[-1]
 
@@ -103,14 +105,22 @@ def get_CCI_results(dfs_conditions, dfs_yields, hovermode, n_years_for_trend, cr
                 lvi=df_yield.last_valid_index()
                 df_yield.loc[last_year] = df_yield.loc[lvi] # add row/index for the current year to be able to calculate the trend yield
                 df_yield['year']=df_yield.index # becuase otherwise 'year' is wrong
+                most_recent_data='Trend Yield'
                 df_yield.loc[last_year] = trend_yield(df_yield, start_year=last_year, n_years_min=n_years_for_trend, rolling=False, yield_col=state.upper()).loc[last_year][['trend_yield']].values[0]
+            else:
+                most_recent_data='Bottom up Approach'
+                df_yield['year']=df_yield.index
+                trend_yield_value = trend_yield(df_yield, start_year=last_year, n_years_min=n_years_for_trend, rolling=False, yield_col=state.upper()).loc[last_year][['trend_yield']].values[0]
+
 
             df_yield['year']=df_yield.index
 
             # R-Squared Analysis
             if rsq_analysis:
+                # whole period if requested
                 days_rsq = df.index.unique()
             else:
+                # only the user selected day
                 days_rsq = [last_day_data]
                 days_rsq = [last_day_season]
 
@@ -138,6 +148,8 @@ def get_CCI_results(dfs_conditions, dfs_yields, hovermode, n_years_for_trend, cr
 
                     df_data_vs_seas = pd.concat([df_last_data, df_last_season], axis=1)
                     df_data_vs_seas = df_data_vs_seas.dropna() # because with Delta, the first one it is going to be NaN (as there is no previous year to the first one)
+                    mask=((df_data_vs_seas['last_data']>0.0001) & (df_data_vs_seas['last_season']>0.0001)) # to remove the missing data
+                    df_data_vs_seas=df_data_vs_seas[mask]
 
                     rsq = Fit_Model(df_data_vs_seas,y_col=y,x_cols=[x], extract_only='rsquared')
                     rsq_df_1['day'].append(last_day)
@@ -153,14 +165,16 @@ def get_CCI_results(dfs_conditions, dfs_yields, hovermode, n_years_for_trend, cr
                         all_models=px.get_trendline_results(fig).px_fit_results
                         model=all_models[0]
                         
-                        add_today(fig=fig,df=df_data_vs_seas,x_col=x, y_col=y, size=10, color='red', symbol='star', name='Most Recent Data', model=None) # add today
-                        prediction = add_today(fig=fig,df=df_data_vs_seas,x_col=x, y_col=y, size=7, color='black', symbol='x', name='Model', model=model) # add prediction
-                        
-                        title=state +' - now vs season end - Prediction: ' + format(prediction,'.2f')
+                        current_condition=df_data_vs_seas[x].values[-1]
+                        add_today(fig=fig,df=df_data_vs_seas,x_col=x, y_col=y, size=8, color='green', symbol='x', name='Current Conditions', model=None) # add today
+                        prediction = add_today(fig=fig,df=df_data_vs_seas,x_col=x, y_col=y, size=10, color='red', symbol='star', name='End of Season Conditions', model=model) # add prediction
+                        end_season_condition=prediction
+                        title=state +' - Current Condition: ' + format(current_condition,'.2f') +' - End of season Prediction: ' + format(prediction,'.2f')
                         fig.update_traces(textposition="top center")
                         fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
                         fo.insert(0,{'state':state,'analysis':analysis, 'fig':fig,'model':model, 'df':df_data_vs_seas, 'prediction':prediction})
 
+                # CCI analysis R-squared
                 if True:
                     x='Delta Conditions'
                     y='Delta Yield'
@@ -193,13 +207,28 @@ def get_CCI_results(dfs_conditions, dfs_yields, hovermode, n_years_for_trend, cr
             fig = px.scatter(df, x=x, y=y, text='year', trendline="ols")
 
             all_models=px.get_trendline_results(fig).px_fit_results
-            model=all_models[0]
-            
-            add_today(fig=fig,df=df,x_col=x, y_col=y, size=10, color='red', symbol='star', name='Most Recent Data', model=None) # add today
-            prediction = df['Prev_Yield'].values[-1]+ add_today(fig=fig,df=df,x_col=x, y_col=y, size=7, color='black', symbol='x', name='Model', model=model) # add prediction
-            
+            model=all_models[0]    
+
+            add_today(fig=fig,df=df,x_col=x, y_col=y, size=8, color='green', symbol='x', name=most_recent_data, model=None) # add today
+            prediction = df['Prev_Yield'].values[-1]+ add_today(fig=fig,df=df,x_col=x, y_col=y, size=10, color='red', symbol='star', name='CCI Model', model=model) # add prediction
+            CCI_yield=prediction
+            if trend_yield_value>0: add_point(fig=fig,x=df[x].values[-1], y=trend_yield_value-df['Prev_Yield'].values[-1], size=8, color='black', symbol='x', name='Trend Yield')
+
+            # add end of season estimate
+            title_suffix = ''
+            if end_season_condition is not None:
+                tmp=df.copy().iloc[-2:]
+                tmp['Conditions'].iloc[-1]=end_season_condition
+                tmp['Delta Conditions'] = tmp['Conditions'].diff()
+
+                pred_df=sm.add_constant(tmp, has_constant='add').loc[last_year][['const',x]]
+                end_season_delta=model.predict(pred_df)[0]
+                end_season_yield=df['Prev_Yield'].values[-1]+end_season_delta
+                title_suffix = ' - End of Season: ' + format(end_season_yield,'.2f')
+                add_point(fig=fig,x=tmp[x].values[-1], y=end_season_delta, size=8, color='orange', symbol='x', name='Proj Condition')
+
             # As this is a delta chart, I need to add the previous year to the estimate
-            title=state +' - ' + commodity + ' - '+y+' vs ' + x +' (YOY) ' + ' - Prediction: ' + format(prediction,'.2f')
+            title=state +' - '+y+' vs ' + x +' (YOY) ' + ' - Prediction: ' + format(prediction,'.2f')+ title_suffix
             fig.update_traces(textposition="top center")
             fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
             fo.insert(0,{'state':state,'analysis':analysis, 'fig':fig,'model':model, 'df':df, 'prediction':prediction})
@@ -225,7 +254,7 @@ def get_CCI_results(dfs_conditions, dfs_yields, hovermode, n_years_for_trend, cr
             x='year'
             y=state.upper()
             
-            mask= ((df_yield.index>=last_year-n_years_for_trend) & (df_yield.index<=last_year))
+            mask= ((df_yield.index>=last_year-n_years_for_trend) & (df_yield.index<=last_year-1))
             trend_df=df_yield[mask]
             fig = px.scatter(trend_df, x=x, y=y, trendline="ols")
             fig.update_traces(marker=dict(size=10, color='black'))
@@ -233,32 +262,41 @@ def get_CCI_results(dfs_conditions, dfs_yields, hovermode, n_years_for_trend, cr
             all_models=px.get_trendline_results(fig).px_fit_results
             model=all_models[0]
 
-            add_today(fig=fig,df=df_yield,x_col=x, y_col=y, size=10, color='red', symbol='star', name='Most Recent Data', model=None) # add today
-            prediction = add_today(fig=fig,df=df_yield,x_col=x, y_col=y, size=7, color='black', symbol='x', name='Model', model=model) # add prediction
-                
+            add_today(fig=fig,df=df_yield,x_col=x, y_col=y, size=8, color='green', symbol='x', name=most_recent_data, model=None) # add today
+            # prediction = add_today(fig=fig,df=df_yield,x_col=x, y_col=y, size=10, color='red', symbol='star', name='Trend Yield', model=model) # add prediction
+            add_point(fig=fig,x=df_yield[x].values[-1], y=CCI_yield, size=10, color='red', symbol='star', name='CCI Model')
+  
+            if end_season_condition is not None:
+                add_point(fig=fig,x=df_yield[x].values[-1], y=end_season_yield, size=8, color='orange', symbol='x', name='Proj Condition')
+
             title=state +' - Trend Yield: ' + format(prediction,'.2f')
             fig.update_traces(textposition="top center")
             fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
-            # fo.insert(0,{'state':state,'analysis':analysis, 'fig':fig,'model':model, 'df':df_yield, 'prediction':prediction})
             fo.append({'state':state,'analysis':analysis, 'fig':fig,'model':model, 'df':df_yield, 'prediction':prediction})
+            if trend_yield_value>0: add_point(fig=fig,x=df[x].values[-1], y=trend_yield_value, size=8, color='black', symbol='x', name='Trend Yield')
 
         # Yield vs Conditions Chart
-        if False and len(df)>0:
+        if True and len(df)>0:
             analysis='cond'
             x='Conditions'
             y='Yield'
+            
             fig = px.scatter(df, x=x, y=y, text='year', trendline="ols")
 
             all_models=px.get_trendline_results(fig).px_fit_results
             model=all_models[0]
             
-            add_today(fig=fig,df=df,x_col=x, y_col=y, size=10, color='red', symbol='star', name='Most Recent Data', model=None) # add today
-            prediction = add_today(fig=fig,df=df,x_col=x, y_col=y, size=7, color='black', symbol='x', name='Model', model=model) # add prediction
-                
-            title=state +' - ' + commodity + ' - '+y+' vs ' + x + ' - Prediction: ' + format(prediction,'.2f')
+            add_today(fig=fig,df=df,x_col=x, y_col=y, size=8, color='green', symbol='x', name=most_recent_data, model=None) # add today
+            # prediction = add_today(fig=fig,df=df,x_col=x, y_col=y, size=10, color='red', symbol='star', name='CCI Model', model=model) # add prediction                
+            if trend_yield_value>0: add_point(fig=fig,x=df[x].values[-1], y=trend_yield_value, size=8, color='black', symbol='x', name='Trend Yield')
+            add_point(fig=fig,x=df[x].values[-1], y=CCI_yield, size=10, color='red', symbol='star', name='CCI Model')
+
+            if end_season_condition is not None:
+                add_point(fig=fig,x=end_season_condition, y=end_season_yield, size=8, color='orange', symbol='x', name='Proj Condition')
+
+            title=state +' - '+y+' vs ' + x #+ ' - Prediction: ' + format(prediction,'.2f')
             fig.update_traces(textposition="top center")
             fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
-            # fo.insert(0,{'state':state,'analysis':analysis, 'fig':fig,'model':model, 'df':df, 'prediction':prediction})
             fo.append({'state':state,'analysis':analysis, 'fig':fig,'model':model, 'df':df, 'prediction':prediction})            
     return fo
 
@@ -309,6 +347,14 @@ def seas_day(date, ref_year_start= dt.today()):
             return dt(LLY-1, date.month, date.day)
         else:
             return dt(LLY, date.month, date.day)
+
+
+def add_point(fig, x, y, today_idx=None, size=10, color='black', symbol='star', name='Point', row=1, col=1):
+    y_str = 'Y: %{y:.2f}'
+    x_str = 'X: %{x:.2f}'
+    hovertemplate="<br>".join([name, y_str, x_str, "<extra></extra>"])
+    fig.add_trace(go.Scatter(name=name,x=[x], y=[y], mode = 'markers+text', text=name, marker_symbol = symbol,marker_size = size, marker_color=color, hovertemplate=hovertemplate), row=row, col=col)
+    return True
 
 def add_today(fig, df, x_col, y_col, today_idx=None, size=10, color='red', symbol='star', name='Today', model=None, row=1, col=1):
     """
