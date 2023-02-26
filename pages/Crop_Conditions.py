@@ -6,6 +6,7 @@ import func as fu
 
 # Declarations and preliminaries
 crop_to_estimate=2023
+progress_bar=None
 if True:
     if 'crop_conditions' not in st.session_state:
         st.session_state['crop_conditions']={}  
@@ -124,7 +125,8 @@ if True:
         rsq_analysis=True
 
     CCI_results = fu.get_CCI_results(crop_to_estimate, dfs_GE, df_yields, crop_year_start=crop_year_start,  hovermode=hovermode, n_years_for_trend=n_years_for_trend, rsq_analysis=rsq_analysis, progress_bar=progress_bar)
-    complete=0.95; progress_bar.progress(complete, text='Aggregating all the States...')   
+    if progress_bar is not None:
+        complete=0.95; progress_bar.progress(complete, text='Aggregating all the States...')   
     
 
 # 'Home made' US total calculation
