@@ -67,19 +67,19 @@ if True or (st.session_state['crop_conditions'][commodity]['dfs_conditions'] is 
         step=5
         
         selected=[s for s in options_states if s!='US Total']
-        progess_bar = st.progress(complete, text='Getting Conditions...')
+        progress_bar = st.progress(complete, text='Getting Conditions...')
         dfs_conditions=qs.get_USA_conditions_parallel(comm_download.upper(), state_name=selected)
 
-        complete=complete+step; progess_bar.progress(complete, text='Getting Yields...')
+        complete=complete+step; progress_bar.progress(complete, text='Getting Yields...')
         df_yields=qs.get_USA_yields_weights(comm_download.upper(), aggregate_level='STATE', state_name=selected,output='value')    
 
-        complete=complete+step; progess_bar.progress(complete, text='Calculating Production Weights...')
+        complete=complete+step; progress_bar.progress(complete, text='Calculating Production Weights...')
         df_prod_weights=  qs.get_USA_prod_weights(commodity, aggregate_level='STATE', output='%')
 
-        complete=complete+step; progess_bar.progress(complete, text='Getting Planted Areas...')        
+        complete=complete+step; progress_bar.progress(complete, text='Getting Planted Areas...')        
         df_plant= qs.get_USA_area_planted_weights(commodity, aggregate_level='STATE', output='value', n_years_estimate_by_class=5)
 
-        complete=complete+step; progess_bar.progress(complete, text='Getting Harversted Areas...')        
+        complete=complete+step; progress_bar.progress(complete, text='Getting Harversted Areas...')        
         df_harv=qs.get_USA_area_harvested_weights(commodity, aggregate_level='STATE', output='value')
         
         st.session_state['crop_conditions'][commodity]['dfs_conditions']=dfs_conditions
@@ -123,7 +123,9 @@ if True:
     else:
         rsq_analysis=True
 
-    CCI_results = fu.get_CCI_results(crop_to_estimate, dfs_GE, df_yields, crop_year_start=crop_year_start,  hovermode=hovermode, n_years_for_trend=n_years_for_trend, rsq_analysis=rsq_analysis)
+    CCI_results = fu.get_CCI_results(crop_to_estimate, dfs_GE, df_yields, crop_year_start=crop_year_start,  hovermode=hovermode, n_years_for_trend=n_years_for_trend, rsq_analysis=rsq_analysis, progress_bar=progress_bar)
+    complete=0.95; progress_bar.progress(complete, text='Aggregating all the States...')   
+    
 
 # 'Home made' US total calculation
 if TOTAL_US_DM:    
@@ -196,19 +198,15 @@ if TOTAL_US_DM:
     all_conditions=all_conditions.rename(columns={'US TOTAL':'Value'})
     dfs_GE={'US TOTAL':all_conditions[['year','seas_day', 'Value']]} # output columns are 'year', 'seas_day' (for the chart), 'Value' (GE = good + excellent)
 
-    # Old Implementation ('US Total' from USDA)
-    if False:
-        df_yields = qs.get_USA_yields(comm_download, aggregate_level='NATIONAL')[['Value']]
-        df_yields=df_yields.rename(columns={'Value':'US TOTAL'})
-        # New Implementation ('US Total' from calculation)
-    else:    
-        # This is for when there are still no conditions for the new year and so it provides the last actual value and the calculated value for the same year
-        df_yields = df_state_yield_pred[:]        
-        mask=(df_yields.index.duplicated(keep='first'))
-        df_yields=df_yields[~mask]
+
+    # This is for when there are still no conditions for the new year and so it provides the last actual value and the calculated value for the same year
+    df_yields = df_state_yield_pred[:]        
+    mask=(df_yields.index.duplicated(keep='first'))
+    df_yields=df_yields[~mask]
 
     # Calculating the CCI Results
     CCI_results = fu.get_CCI_results(crop_to_estimate, dfs_GE, df_yields,crop_year_start=crop_year_start, hovermode=hovermode, n_years_for_trend=n_years_for_trend, rsq_analysis=True)
+    progress_bar.empty()
 
     with st.expander('Calculation Data Details'):
         st.write('all_conditions_raw',all_conditions_raw.sort_index(ascending=False))

@@ -75,7 +75,7 @@ def get_conditions_chart(df, state_name, class_desc, hovermode, col='Value'):
     fig.update_layout(hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
     return fig
 
-def get_CCI_results(crop_to_estimate, dfs_conditions, dfs_yields, hovermode, n_years_for_trend, crop_year_start, rsq_analysis=False):
+def get_CCI_results(crop_to_estimate, dfs_conditions, dfs_yields, hovermode, n_years_for_trend, crop_year_start, rsq_analysis=False, progress_bar=None):
     fo = []
     metrics={}
     proj_size=8; proj_color='orange'; proj_symbol='x'; proj_name='Proj Condition'
@@ -84,7 +84,12 @@ def get_CCI_results(crop_to_estimate, dfs_conditions, dfs_yields, hovermode, n_y
     bottom_size=8; bottom_color='green'; bottom_symbol='x'; bottom_name='Bottom up'
     usda_size=8; usda_color='blue'; usda_symbol='x'; usda_name='USDA'
 
+    complete=0
+    step=1.0/len(dfs_conditions)
     for state in dfs_conditions:
+        if not rsq_analysis:
+            complete=complete+step; progress_bar.progress(complete, text=f'Calculating {state}...'  ); 
+
         # Preliminaries
         if True:
             commodity=''
