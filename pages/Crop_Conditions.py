@@ -10,8 +10,7 @@ if True:
     if 'crop_conditions' not in st.session_state:
         st.session_state['crop_conditions']={}  
 
-    st.set_page_config(page_title='Crop Conditions',layout='wide',initial_sidebar_state='expanded')
-    st.markdown("### Crop Conditions")
+    st.set_page_config(page_title='Crop Conditions',layout='wide',initial_sidebar_state='expanded')    
 
     # Events
     def on_change_commodity():
@@ -28,24 +27,22 @@ with st.sidebar:
     else:
         comm_download=commodity
 
-    if commodity in st.session_state['crop_conditions']:
+    if (False) and (commodity in st.session_state['crop_conditions']):
         options_states=st.session_state['crop_conditions'][commodity]['options_states']
     else:
         st.session_state['crop_conditions'][commodity]={}
         st.session_state['crop_conditions'][commodity]['options_states']=None
         st.session_state['crop_conditions'][commodity]['dfs_conditions']=None
         st.session_state['crop_conditions'][commodity]['df_yields']=None
+        options_states=['US Total']
 
         with st.spinner('Checking Available States...'):
-            options_states=qs.get_USA_conditions_states(comm_download)
+            options_states=options_states+qs.get_USA_conditions_states(comm_download)
             st.session_state['crop_conditions'][commodity]['options_states']=options_states
     
     # Commodity customization
     if 'WHEAT, WINTER' in commodity.upper():
         crop_year_start=dt(dt.today().year,9,1)
-
-    if commodity != 'WHEAT, SPRING, DURUM'.title():
-        options_states=['US Total'] + options_states # Because USDA doesn' provide National numbers for 'WHEAT, SPRING, DURUM'
 
     state = st.selectbox("State", options_states)
 
@@ -58,19 +55,31 @@ with st.sidebar:
     if state=='US Total':
         TOTAL_US_DM = st.checkbox('Avere US Total', False, on_change=on_change_commodity)
 
+st.markdown(f"### Crop Conditions - {commodity} - {state}")
+
 # Retrieve the data
 if True or (st.session_state['crop_conditions'][commodity]['dfs_conditions'] is None):
-    # st.write('From USDA')
-
     if TOTAL_US_DM:
-        if 'US Total' in options_states:
-            options_states.remove('US Total')
-
-        selected=options_states # for us total
+        
+        # if 'US Total' in options_states:
+        #     options_states.remove('US Total')
+        complete=0
+        step=5
+        
+        selected=[s for s in options_states if s!='US Total']
+        progess_bar = st.progress(complete, text='Getting Conditions...')
         dfs_conditions=qs.get_USA_conditions_parallel(comm_download.upper(), state_name=selected)
-        df_yields=qs.get_USA_yields_weights(comm_download.upper(), aggregate_level='STATE', state_name=selected,output='value')        
+
+        complete=complete+step; progess_bar.progress(complete, text='Getting Yields...')
+        df_yields=qs.get_USA_yields_weights(comm_download.upper(), aggregate_level='STATE', state_name=selected,output='value')    
+
+        complete=complete+step; progess_bar.progress(complete, text='Calculating Production Weights...')
         df_prod_weights=  qs.get_USA_prod_weights(commodity, aggregate_level='STATE', output='%')
+
+        complete=complete+step; progess_bar.progress(complete, text='Getting Planted Areas...')        
         df_plant= qs.get_USA_area_planted_weights(commodity, aggregate_level='STATE', output='value', n_years_estimate_by_class=5)
+
+        complete=complete+step; progess_bar.progress(complete, text='Getting Harversted Areas...')        
         df_harv=qs.get_USA_area_harvested_weights(commodity, aggregate_level='STATE', output='value')
         
         st.session_state['crop_conditions'][commodity]['dfs_conditions']=dfs_conditions
@@ -82,8 +91,8 @@ if True or (st.session_state['crop_conditions'][commodity]['dfs_conditions'] is 
         selected=[state]
         
         if selected[0]=='US Total':
-            if commodity.upper() in qs.wheat_by_class:
-                st.markdown('The USDA does NOT give a total by-class.')
+            if (commodity.upper() in qs.wheat_by_class) or (commodity.upper()=='WHEAT, SPRING, DURUM'):
+                st.markdown('The USDA does NOT give a total for ' + commodity)
                 st.markdown('* Tick the "Avere US Total" on the left sidebar to Calculate it from State Yields')
                 st.markdown('* It takes some time, as I has to download the full history of state-by-state conditions')
                 st.stop()
@@ -216,7 +225,7 @@ if TOTAL_US_DM:
         st.write('df_yield_pred', df_state_yield_pred[sorted_cols].sort_index(ascending=False))
 
     # Bottom Up Approach
-    if True:
+    if False:
         st.markdown('---')
         st.markdown('### Bottom Up Approach')
         st.markdown('1) Calculate state-by-state yields (from CCI regressions)')
@@ -228,7 +237,7 @@ if TOTAL_US_DM:
         st.write(tmp)
 
     # Production Weighted Average Approach
-    if True:
+    if False:
         st.markdown('---')
         st.markdown('### Production Weighted Average Approach')
         st.markdown('1) Calculate US Total by averaging the single states conditions (weighed by production)')
@@ -242,6 +251,9 @@ if True:
         if state not in already_plot:
             st.plotly_chart(fu.get_conditions_chart(dfs_GE[state], state, commodity, hovermode=hovermode), use_container_width=True)
             already_plot.append(state)
+            with st.expander(state + ' - Details'):
+                st.dataframe(dfs_GE[state].sort_index(ascending=False))
+       
 
         st.plotly_chart(f['fig'], use_container_width=True)
         with st.expander(state + ' - Details'):

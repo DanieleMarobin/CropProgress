@@ -70,16 +70,17 @@ def get_conditions_chart(df, state_name, class_desc, hovermode, col='Value'):
     fig.add_trace(go.Scatter(x=df[mask]['seas_day'], y=df[mask][col],fill=None, mode='lines', name=str(last_year-1),text=str(last_year), line=dict(color='black', width=3)))
 
     mask=df['year']==last_year
-    fig.add_trace(go.Scatter(x=df[mask]['seas_day'], y=df[mask][col],fill=None, mode='lines', name=str(last_year), text=str(last_year), line=dict(color='red', width=4)))
+    fig.add_trace(go.Scatter(x=df[mask]['seas_day'], y=df[mask][col],fill=None, mode='lines+markers', name=str(last_year), text=str(last_year), line=dict(color='red', width=4)))
 
     fig.update_layout(hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
     return fig
 
 def get_CCI_results(crop_to_estimate, dfs_conditions, dfs_yields, hovermode, n_years_for_trend, crop_year_start, rsq_analysis=False):
     fo = []
+    metrics={}
     proj_size=8; proj_color='orange'; proj_symbol='x'; proj_name='Proj Condition'
     cci_size=10; cci_color='red'; cci_symbol='star'; cci_name='CCI Model'
-    trend_size=8; trend_color='black'; trend_symbol='x'; trend_name='trend Yield'
+    trend_size=8; trend_color='black'; trend_symbol='x'; trend_name='Trend Yield'
     bottom_size=8; bottom_color='green'; bottom_symbol='x'; bottom_name='Bottom up'
     usda_size=8; usda_color='blue'; usda_symbol='x'; usda_name='USDA'
 
@@ -113,6 +114,7 @@ def get_CCI_results(crop_to_estimate, dfs_conditions, dfs_yields, hovermode, n_y
                 df_yield['year']=df_yield.index # because otherwise 'year' is wrong
                 recent_size=trend_size; recent_color=trend_color; recent_symbol=trend_symbol; recent_name=trend_name
                 df_yield.loc[last_year] = trend_yield(df_yield, start_year=last_year, n_years_min=n_years_for_trend, rolling=False, yield_col=state.upper()).loc[last_year][['trend_yield']].values[0]
+                metrics[trend_name]=df_yield.loc[last_year][state.upper()]
             else:
                 if last_year==crop_to_estimate:
                     recent_size=bottom_size; recent_color=bottom_color; recent_symbol=bottom_symbol; recent_name=bottom_name
@@ -121,6 +123,8 @@ def get_CCI_results(crop_to_estimate, dfs_conditions, dfs_yields, hovermode, n_y
 
                 df_yield['year']=df_yield.index
                 trend_yield_value = trend_yield(df_yield, start_year=last_year, n_years_min=n_years_for_trend, rolling=False, yield_col=state.upper()).loc[last_year][['trend_yield']].values[0]
+                metrics[trend_name]=trend_yield_value
+                metrics[recent_name]=df_yield.loc[last_year][state.upper()]
 
 
             df_yield['year']=df_yield.index
@@ -222,6 +226,7 @@ def get_CCI_results(crop_to_estimate, dfs_conditions, dfs_yields, hovermode, n_y
             add_today(fig=fig,df=df,x_col=x, y_col=y, size=recent_size, color=recent_color, symbol=recent_symbol, name=recent_name, model=None) # add today
             prediction = df['Prev_Yield'].values[-1]+ add_today(fig=fig,df=df,x_col=x, y_col=y, size=10, color='red', symbol='star', name='CCI Model', model=model) # add prediction
             CCI_yield=prediction
+            metrics[cci_name]=CCI_yield
             if trend_yield_value>0: add_point(fig=fig,x=df[x].values[-1], y=trend_yield_value-df['Prev_Yield'].values[-1], size=trend_size, color=trend_color, symbol=trend_symbol, name=trend_name)
 
             # add end of season estimate
@@ -234,6 +239,8 @@ def get_CCI_results(crop_to_estimate, dfs_conditions, dfs_yields, hovermode, n_y
                 pred_df=sm.add_constant(tmp, has_constant='add').loc[last_year][['const',x]]
                 end_season_delta=model.predict(pred_df)[0]
                 end_season_yield=df['Prev_Yield'].values[-1]+end_season_delta
+                metrics[proj_name]=end_season_yield
+
                 title_suffix = ' - End of Season: ' + format(end_season_yield,'.2f')
                 add_point(fig=fig,x=tmp[x].values[-1], y=end_season_delta, size=proj_size, color=proj_color, symbol=proj_symbol, name=proj_name)
 
@@ -307,7 +314,13 @@ def get_CCI_results(crop_to_estimate, dfs_conditions, dfs_yields, hovermode, n_y
             title=state +' - '+y+' vs ' + x #+ ' - Prediction: ' + format(prediction,'.2f')
             fig.update_traces(textposition="top center")
             fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
-            fo.append({'state':state,'analysis':analysis, 'fig':fig,'model':model, 'df':df, 'prediction':prediction})            
+            fo.append({'state':state,'analysis':analysis, 'fig':fig,'model':model, 'df':df, 'prediction':prediction})
+
+        if rsq_analysis:
+            metric_cols = st.columns(len(metrics))
+
+            for i, k in enumerate(metrics):
+                metric_cols[i].metric(label=k, value="{:.2f}".format(metrics[k]))
     return fo
 
 
