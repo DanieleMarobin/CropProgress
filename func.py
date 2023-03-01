@@ -291,7 +291,7 @@ def get_CCI_results(crop_to_estimate, dfs_conditions, dfs_yields, hovermode, n_y
             if end_season_condition is not None:
                 add_point(fig=fig,x=df_yield[x].values[-1], y=end_season_yield, size=proj_size, color=proj_color, symbol=proj_symbol, name=proj_name)
 
-            title=state +' - Trend Yield: ' + format(trend_yield_value,'.2f')
+            title=state +' - Trend Yield: ' + format(metrics[trend_name],'.2f')
             fig.update_traces(textposition="top center")
             fig.update_layout(title= title, hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
             fo.append({'state':state,'analysis':analysis, 'fig':fig,'model':model, 'df':df_yield, 'prediction':prediction})
