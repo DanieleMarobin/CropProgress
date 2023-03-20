@@ -147,8 +147,14 @@ def QS_url(input:QS_input):
 
 def get_data(input: QS_input):
     url = QS_url(input)
-    print(url)
-    fo = pd.read_csv(url,low_memory=False)  
+    try:    
+        fo = pd.read_csv(url,low_memory=False)
+    except:
+        print('--------------------------------------------------------------------------------')
+        print('URL that failed to download:')        
+        print(url)
+        print('--------------------------------------------------------------------------------')
+        fo=None        
     return fo
 
 def get_USA_conditions_states(commodity):
