@@ -150,12 +150,12 @@ def get_data(input: QS_input):
     try:    
         fo = pd.read_csv(url,low_memory=False)
     except:
-        print('--------------------------------------------------------------------------------')
-        print('URL that failed to download:')        
+        print(f'-----------------------------------{dt.now()}---------------------------------------------')
+        print('URL that failed to download:')
         print(url)
         print('--------------------------------------------------------------------------------')
         fo=None
-        
+
     return fo
 
 def get_USA_conditions_states(commodity):
