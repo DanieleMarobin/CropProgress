@@ -147,12 +147,12 @@ def QS_url(input:QS_input):
 
 def get_data(input: QS_input):
     url = QS_url(input)
-    # print(url)
+    print(url)
     fo = pd.read_csv(url,low_memory=False)  
     return fo
 
 def get_USA_conditions_states(commodity):
-    df=get_USA_conditions(commodity,aggregate_level='STATE',years=[dt.today().year-1])
+    df=get_USA_conditions(commodity,aggregate_level='STATE',years=[int(dt.today().year-1)])
     fo=list(set(df['state_name']))
     fo.sort()
     fo=[s.title() for s in fo]
@@ -193,18 +193,21 @@ def get_USA_conditions(commodity='CORN', aggregate_level='NATIONAL', state_name=
     fo=fo.sort_values(by='year',ascending=True)
 
     return fo
-def get_USA_conditions_parallel(commodity='CORN', aggregate_level='STATE', state_name=[], years=[], cols_subset=[]):
+def get_USA_conditions_parallel(commodity='CORN', aggregate_level='STATE', state_name=[], years=[], cols_subset=[], parallel='thread', max_workers=None):
     dfs={}
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=100) as executor:
-        results={}
+    if parallel is None:
         for s in state_name:
-            results[s] = executor.submit(get_USA_conditions, commodity, aggregate_level, [s], years, cols_subset)
+            dfs[s]=get_USA_conditions(commodity=commodity,aggregate_level=aggregate_level,state_name=[s], years=years, cols_subset=cols_subset)
 
-    for s, res in results.items():
-        dfs[s]=res.result()
-    
-    # df = pd.concat(dfs.values(), axis=0)
+    elif parallel=='thread':
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results={}
+            for s in state_name:
+                results[s] = executor.submit(get_USA_conditions, commodity, aggregate_level, [s], years, cols_subset)
+
+        for s, res in results.items():
+            dfs[s]=res.result()    
 
     return dfs
 

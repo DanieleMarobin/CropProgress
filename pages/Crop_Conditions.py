@@ -7,6 +7,7 @@ import func as fu
 # Declarations and preliminaries
 crop_to_estimate=2023
 progress_bar=None
+
 if True:
     if 'crop_conditions' not in st.session_state:
         st.session_state['crop_conditions']={}  
@@ -17,6 +18,12 @@ if True:
     def on_change_commodity():
         if 'crop_conditions' in st.session_state:
             del st.session_state['crop_conditions']
+
+
+# st.dataframe(qs.get_USA_conditions('wheat',aggregate_level='STATE',years=[dt.today().year-1]))
+# st.write(dt.today().year-1)
+# st.dataframe(qs.get_USA_conditions('CORN',aggregate_level='STATE',years=[dt.today().year-1]))
+# st.dataframe(qs.get_USA_conditions('CORN',aggregate_level='STATE',years=[int(dt.today().year-1)]))
 
 # Commodity / State selection
 with st.sidebar:
@@ -69,7 +76,7 @@ if True or (st.session_state['crop_conditions'][commodity]['dfs_conditions'] is 
         
         selected=[s for s in options_states if s!='US Total']
         progress_bar = st.progress(complete, text='Getting Conditions...')
-        dfs_conditions=qs.get_USA_conditions_parallel(comm_download.upper(), state_name=selected)
+        dfs_conditions=qs.get_USA_conditions_parallel(comm_download.upper(), state_name=selected, parallel='thread')
 
         complete=complete+step; progress_bar.progress(complete, text='Getting Yields...')
         df_yields=qs.get_USA_yields_weights(comm_download.upper(), aggregate_level='STATE', state_name=selected,output='value')    
