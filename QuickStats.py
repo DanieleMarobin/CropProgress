@@ -154,7 +154,8 @@ def get_data(input: QS_input):
         print('URL that failed to download:')        
         print(url)
         print('--------------------------------------------------------------------------------')
-        fo=None        
+        fo=None
+        
     return fo
 
 def get_USA_conditions_states(commodity):
@@ -196,6 +197,10 @@ def get_USA_conditions(commodity='CORN', aggregate_level='NATIONAL', state_name=
 
     fo=get_data(dl)
     if len(cols_subset)>0: fo = fo[cols_subset]
+
+    if fo is None:
+        return
+
     fo=fo.sort_values(by='year',ascending=True)
 
     return fo
