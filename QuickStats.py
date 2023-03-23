@@ -222,7 +222,7 @@ def get_USA_conditions_parallel(commodity='CORN', aggregate_level='STATE', state
 
     return dfs
 
-def extract_GE_conditions(df, crop_year_start):
+def extract_conditions(df, crop_year_start, conditions_to_extract=['PCT EXCELLENT', 'PCT GOOD']):
     '''
     the output is a daily table created with 'yearly_interpolation':
         -> so it is done properly
@@ -241,7 +241,7 @@ def extract_GE_conditions(df, crop_year_start):
         mask=(df['week_ending'].dt.month<crop_year_start.month) & (df['week_ending'].dt.year<df['year'])
         df.loc[mask,'year']=df['week_ending'].dt.year
 
-    mask=df['unit_desc'].isin(['PCT EXCELLENT', 'PCT GOOD'])
+    mask=df['unit_desc'].isin(conditions_to_extract)
     df = df[mask].groupby(['year', 'week_ending'], as_index=False).agg({'Value': 'sum'})
 
     mask=(df['Value']>0) # this to drop the 0s 

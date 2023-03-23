@@ -54,6 +54,12 @@ with st.sidebar:
 
     state = st.selectbox("State", options_states)
 
+    pct_excellent = st.checkbox('Excellent',value=True)
+    pct_good = st.checkbox('Good',value=True)
+    pct_fair = st.checkbox('Fair',value=False)
+    pct_poor = st.checkbox('Poor',value=False)
+    pct_very_poor = st.checkbox('Very Poor',value=False)
+
     # hovermode = st.selectbox('Hovermode',['x', 'y', 'closest', 'x unified', 'y unified'],index=2)
     hovermode = 'closest'
 
@@ -120,11 +126,26 @@ else:
 
 # Common calculations
 if True:
-    # Extract the Good and Excellent
-    dfs_GE={}
-    
+    # Extract the Good and Excellent (changed to user selected, but historically was Good and Excellent)
+    conditions_to_extract=[]
+    if pct_excellent:
+        conditions_to_extract=conditions_to_extract+['PCT EXCELLENT']
+    if pct_good:
+        conditions_to_extract=conditions_to_extract+['PCT GOOD']
+    if pct_fair:
+        conditions_to_extract=conditions_to_extract+['PCT FAIR']
+    if pct_poor:
+        conditions_to_extract=conditions_to_extract+['PCT POOR']
+    if pct_very_poor:
+        conditions_to_extract=conditions_to_extract+['PCT VERY POOR']                                
+
+    if len(conditions_to_extract)==0:
+        st.stop()
+
+    dfs_GE={}    
+
     for state, df in dfs_conditions.items():
-        dfs_GE[state]=qs.extract_GE_conditions(df, crop_year_start)
+        dfs_GE[state]=qs.extract_conditions(df, crop_year_start, conditions_to_extract=conditions_to_extract)
 
     if len(dfs_GE)>1:
         rsq_analysis=False
