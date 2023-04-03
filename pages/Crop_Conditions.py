@@ -8,6 +8,7 @@ import func as fu
 crop_to_estimate=2023
 progress_bar=None
 
+# Preliminaries and Events
 if True:
     if 'crop_conditions' not in st.session_state:
         st.session_state['crop_conditions']={}  
@@ -18,12 +19,6 @@ if True:
     def on_change_commodity():
         if 'crop_conditions' in st.session_state:
             del st.session_state['crop_conditions']
-
-
-# st.dataframe(qs.get_USA_conditions('wheat',aggregate_level='STATE',years=[dt.today().year-1]))
-# st.write(dt.today().year-1)
-# st.dataframe(qs.get_USA_conditions('CORN',aggregate_level='STATE',years=[dt.today().year-1]))
-# st.dataframe(qs.get_USA_conditions('CORN',aggregate_level='STATE',years=[int(dt.today().year-1)]))
 
 # Commodity / State selection
 with st.sidebar:
@@ -241,8 +236,13 @@ if TOTAL_US_DM:
     with st.expander('Calculation Data Details'):
         st.write('all_conditions_raw',all_conditions_raw.sort_index(ascending=False))
         
-        st.write('df_plant',df_plant.sort_index(ascending=False))
+        df_plant=df_plant.sort_index(ascending=False)
+        df_plant=df_plant.T
+        df_plant=df_plant.sort_values(by=2022, ascending=False)
+        st.write('df_plant',df_plant)
+
         st.write('df_harv',df_harv.sort_index(ascending=False))
+        
         st.write('df_harv_pct',df_harv_pct.sort_index(ascending=False))
         
         st.write('df_prod_weights',df_prod_weights.sort_index(ascending=False))
@@ -251,25 +251,6 @@ if TOTAL_US_DM:
 
         sorted_cols=['US TOTAL'] + [c for c in df_state_yield_pred.columns if 'TOTAL' not in c]
         st.write('df_yield_pred', df_state_yield_pred[sorted_cols].sort_index(ascending=False))
-
-    # Bottom Up Approach
-    if False:
-        st.markdown('---')
-        st.markdown('### Bottom Up Approach')
-        st.markdown('1) Calculate state-by-state yields (from CCI regressions)')
-        st.markdown('2) Calculate the US TOTAL by aggregating the above')
-        tmp=df_state_yield_pred[sorted_cols].loc[last_year]
-        if len(tmp)==2:
-            tmp.index=[str(int(tmp.index[0])), str(int(tmp.index[0])) + ' Avere']
-        tmp=tmp.T.dropna()
-        st.write(tmp)
-
-    # Production Weighted Average Approach
-    if False:
-        st.markdown('---')
-        st.markdown('### Production Weighted Average Approach')
-        st.markdown('1) Calculate US Total by averaging the single states conditions (weighed by production)')
-        st.markdown('2) Regress the US Total conditions vs Total US Yield')
 
 # Charts
 if True:
