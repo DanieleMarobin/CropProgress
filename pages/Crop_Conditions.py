@@ -238,19 +238,36 @@ if TOTAL_US_DM:
         
         df_plant=df_plant.sort_index(ascending=False)
         df_plant=df_plant.T
-        df_plant=df_plant.sort_values(by=2022, ascending=False)
+        df_plant=df_plant.sort_values(by=max(df_plant.columns), ascending=False)
         st.write('df_plant',df_plant)
 
-        st.write('df_harv',df_harv.sort_index(ascending=False))
-        
-        st.write('df_harv_pct',df_harv_pct.sort_index(ascending=False))
-        
-        st.write('df_prod_weights',df_prod_weights.sort_index(ascending=False))
+        df_harv=df_harv.sort_index(ascending=False)
+        df_harv=df_harv.T
+        df_harv=df_harv.sort_values(by=max(df_harv.columns), ascending=False)
+        st.write('df_harv',df_harv)
 
-        st.write('all_conditions',all_conditions.sort_index(ascending=False))
+        df_harv_pct=df_harv_pct.sort_index(ascending=False)
+        df_harv_pct=df_harv_pct.T
+        idx = [i for i in df_harv.index if i in df_harv_pct.index]
+        df_harv_pct=df_harv_pct.loc[idx]
+        st.write('df_harv_pct',df_harv_pct)
+        
+        df_prod_weights=df_prod_weights.sort_index(ascending=False)
+        df_prod_weights=df_prod_weights.T
+        df_prod_weights=df_prod_weights.sort_values(by=max(df_prod_weights.columns), ascending=False)
+        st.write('df_prod_weights',df_prod_weights)
 
-        sorted_cols=['US TOTAL'] + [c for c in df_state_yield_pred.columns if 'TOTAL' not in c]
-        st.write('df_yield_pred', df_state_yield_pred[sorted_cols].sort_index(ascending=False))
+        all_conditions=all_conditions.sort_index(ascending=False)
+        # all_conditions=all_conditions.T
+        # idx = [i for i in df_harv.index if i in all_conditions.index]
+        # all_conditions=all_conditions.loc[idx]
+        st.write('all_conditions',all_conditions)
+
+        df_state_yield_pred=df_state_yield_pred.sort_index(ascending=False)
+        df_state_yield_pred=df_state_yield_pred.T
+        idx = [i for i in df_harv.index if i in df_state_yield_pred.index]
+        df_state_yield_pred=df_state_yield_pred.loc[idx]
+        st.write('df_yield_pred', df_state_yield_pred)
 
 # Charts
 if True:

@@ -337,7 +337,7 @@ def get_USA_progress(commodity='CORN', progress_var=None, aggregate_level='NATIO
             
     
     # Edit inputs to make the download possible (for example necessary to modify commodity for spring/winter wheat)
-    elif 'WHEAT' in commodity:
+    if 'WHEAT' in commodity:
         commodity='WHEAT'
 
     dl.commodity_desc.append(commodity)
@@ -346,7 +346,9 @@ def get_USA_progress(commodity='CORN', progress_var=None, aggregate_level='NATIO
     dl.state_name.extend(state_name)
 
     fo=get_data(dl)
-    if len(cols_subset)>0: fo = fo[cols_subset]
+    if len(cols_subset)>0:
+        fo = fo[cols_subset]
+    
     fo=fo.sort_values(by='week_ending',ascending=True)
 
     return fo
