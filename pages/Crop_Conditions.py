@@ -80,10 +80,10 @@ if True or (st.session_state['crop_conditions'][commodity]['dfs_conditions'] is 
         dfs_conditions=qs.get_USA_conditions_parallel(comm_download.upper(), state_name=selected, parallel='thread')
 
         complete=complete+step; progress_bar.progress(complete, text='Getting Yields...')
-        df_yields=qs.get_USA_yields_weights(comm_download.upper(), aggregate_level='STATE', state_name=selected,output='value')    
+        df_yields=qs.get_USA_yields_weights(comm_download.upper(), aggregate_level='STATE', state_name=selected,output='value')
 
         complete=complete+step; progress_bar.progress(complete, text='Calculating Production Weights...')
-        df_prod_weights=  qs.get_USA_prod_weights(commodity, aggregate_level='STATE', output='%')
+        df_prod_weights=qs.get_USA_prod_weights(commodity, aggregate_level='STATE', output='%')
 
         complete=complete+step; progress_bar.progress(complete, text='Getting Planted Areas...')        
         df_plant= qs.get_USA_area_planted_weights(commodity, aggregate_level='STATE', output='value', n_years_estimate_by_class=5)
