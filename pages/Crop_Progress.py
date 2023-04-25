@@ -50,7 +50,7 @@ for progress_var in progress_variables:
     st.plotly_chart(fig, use_container_width=True)
 
     df=df.drop(columns=['seas_day'])
-    df=qs.yearly_interpolation_test(df,'year')
+    df=qs.yearly_interpolation(df,'year')
     # st.dataframe(df)
 
     df=qs.add_seas_day(df, crop_year_start)

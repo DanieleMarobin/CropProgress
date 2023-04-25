@@ -76,6 +76,7 @@ def yearly_interpolation(df, col_year='year', fill_forward=False, fill_backward=
     Important:
         - I normally pass a very simple df, with year and value and a time index
         - df MUST have a time index because it will 'df[mask].resample('1d').asfreq().interpolate()'
+        - df MUST NOT have a time column, because it breaks the .interpolate() algorithm called above
         - it is important because at the end it just interpolates
         - as it is done on an yearly basis, the year col is going to remain a constant
         - the rest needs to be paid attention to
