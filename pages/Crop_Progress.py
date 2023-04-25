@@ -51,9 +51,9 @@ for progress_var in progress_variables:
 
     df=df.drop(columns=['seas_day'])
     df=qs.yearly_interpolation_test(df,'year')
-    st.dataframe(df)
+    # st.dataframe(df)
 
     df=qs.add_seas_day(df, crop_year_start)
-    st.dataframe(df)
+    # st.dataframe(df)
     df=df.pivot_table(index='seas_day',columns='year',values='Value')
     st.dataframe( df)
