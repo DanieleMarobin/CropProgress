@@ -86,10 +86,54 @@ def yearly_interpolation(df, col_year='year', fill_forward=False, fill_backward=
     dfs=[]
 
     years=np.sort(df[col_year].unique())
-
+    
     for y in years:
         mask=(df[col_year]==y)
+        
+        print(df.index)
+
         temp=df[mask].resample('1d').asfreq().interpolate()
+        
+
+        if fill_forward:
+            temp=temp.fillna(method='ffill')
+
+        if fill_backward:
+            temp=temp.fillna(method='bfill')
+
+        dfs.append(temp)
+    
+    return pd.concat(dfs)
+
+def yearly_interpolation_test(df, col_year='year', fill_forward=False, fill_backward=False):
+    """
+    Important:
+        - I normally pass a very simple df, with year and value and a time index
+        - df MUST have a time index because it will 'df[mask].resample('1d').asfreq().interpolate()'
+        - it is important because at the end it just interpolates
+        - as it is done on an yearly basis, the year col is going to remain a constant
+        - the rest needs to be paid attention to
+
+    the idea is to recreate a new Dataframe by concatenating the yearly interpolated ones
+    so there is no risk of interpolating from the end of a crop year to the beginning of the next one
+    """
+    dfs=[]
+
+    years=np.sort(df[col_year].unique())
+    
+    # df=df.drop(columns=[ 'seas_day'])
+    for y in years:
+        mask=(df[col_year]==y)
+        
+        # print(df.index)
+
+        temp=df[mask].resample('1d').asfreq().interpolate()
+
+        # temp=df[mask].resample('1d').asfreq()
+        # temp=temp.reset_index()
+        # temp=temp.interpolate()
+        # temp=temp.interpolate()
+        
 
         if fill_forward:
             temp=temp.fillna(method='ffill')

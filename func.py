@@ -56,7 +56,7 @@ def get_progress_chart(commodity, state_name, progress_var, crop_year_start, hov
     fig.add_trace(go.Scatter(x=df[mask][x], y=df[mask][y], mode='lines', name=str(last_year), text=str(last_year), line=dict(color='red', width=3)))
     
     fig.update_layout(hovermode=hovermode, width=1000, height=1000, xaxis=dict(tickformat="%b %d"))
-    return fig
+    return fig, df
 
 def get_conditions_chart(df, state_name, class_desc, hovermode, col='Value'):
     last_year = df['year'].max()
