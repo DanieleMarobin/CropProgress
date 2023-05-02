@@ -210,8 +210,10 @@ def get_USA_conditions_states(commodity):
     fo=[s.title() for s in fo]
     return fo
 
-def get_USA_conditions(commodity='CORN', aggregate_level='NATIONAL', state_name=[], years=[], cols_subset=[]):
+def get_USA_conditions(commodity='CORN', aggregate_level='NATIONAL', state_name=[], years=[]):
     """
+    the CORN STATE is 89'000 (so we need to split it by state) 
+
     simple use:
         us_yields=qs.get_USA_yields(cols_subset=['Value','year'])
 
@@ -222,6 +224,10 @@ def get_USA_conditions(commodity='CORN', aggregate_level='NATIONAL', state_name=
     commodity=commodity.upper()
     aggregate_level=aggregate_level.upper()
 
+    # hrw -> winter wheat
+    if  commodity in wheat_by_class:     
+        commodity=wheat_by_class[commodity]
+
     dl = QS_input()
     
     dl.short_desc.append(commodity+' - CONDITION, MEASURED IN PCT EXCELLENT')
@@ -230,8 +236,8 @@ def get_USA_conditions(commodity='CORN', aggregate_level='NATIONAL', state_name=
     dl.short_desc.append(commodity+' - CONDITION, MEASURED IN PCT POOR')
     dl.short_desc.append(commodity+' - CONDITION, MEASURED IN PCT VERY POOR')
 
-    # Edit inputs to make the download possible (for example necessary to modify commodity for spring/winter wheat)
-    if 'WHEAT' in commodity:
+    # winter wheat -> wheat
+    if 'WHEAT' in commodity:     
         commodity='WHEAT'
 
     # dl.statisticcat_desc.append('CONDITION')
@@ -241,11 +247,6 @@ def get_USA_conditions(commodity='CORN', aggregate_level='NATIONAL', state_name=
     dl.state_name.extend(state_name)
 
     fo=get_data(dl)
-    if len(cols_subset)>0: fo = fo[cols_subset]
-
-    if fo is None:
-        return
-
     fo=fo.sort_values(by='year',ascending=True)
 
     return fo
