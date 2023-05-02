@@ -250,18 +250,18 @@ def get_USA_conditions(commodity='CORN', aggregate_level='NATIONAL', state_name=
     fo=fo.sort_values(by='year',ascending=True)
 
     return fo
-def get_USA_conditions_parallel(commodity='CORN', aggregate_level='STATE', state_name=[], years=[], cols_subset=[], parallel='thread', max_workers=None):
+def get_USA_conditions_parallel(commodity='CORN', aggregate_level='STATE', state_name=[], years=[], parallel='thread', max_workers=None):
     dfs={}
 
     if parallel is None:
         for s in state_name:
-            dfs[s]=get_USA_conditions(commodity=commodity,aggregate_level=aggregate_level,state_name=[s], years=years, cols_subset=cols_subset)
+            dfs[s]=get_USA_conditions(commodity=commodity,aggregate_level=aggregate_level,state_name=[s], years=years)
 
     elif parallel=='thread':
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             results={}
             for s in state_name:
-                results[s] = executor.submit(get_USA_conditions, commodity, aggregate_level, [s], years, cols_subset)
+                results[s] = executor.submit(get_USA_conditions, commodity, aggregate_level, [s], years)
 
         for s, res in results.items():
             dfs[s]=res.result()    
