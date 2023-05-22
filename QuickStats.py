@@ -91,7 +91,7 @@ def yearly_interpolation(df, col_year='year', fill_forward=False, fill_backward=
     for y in years:
         mask=(df[col_year]==y)
         
-        print(df.index)
+        # print(df.index)
 
         temp=df[mask].resample('1d').asfreq().interpolate()
         

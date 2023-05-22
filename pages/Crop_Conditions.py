@@ -267,7 +267,7 @@ if TOTAL_US_DM:
         df_state_yield_pred=df_state_yield_pred.T
         idx = [i for i in df_harv.index if i in df_state_yield_pred.index]
         df_state_yield_pred=df_state_yield_pred.loc[idx]
-        st.write('df_yield_pred', df_state_yield_pred)
+        # st.write('df_yield_pred', df_state_yield_pred)
 
 # Charts
 if True:
