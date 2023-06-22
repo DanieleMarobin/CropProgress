@@ -510,7 +510,8 @@ def get_USA_area_planted(commodity='CORN', aggregate_level='NATIONAL', state_nam
     dl.short_desc=[commodity+' - ACRES PLANTED']
 
     if commodity=='CORN':
-        dl.short_desc=[commodity+', GRAIN - ACRES PLANTED', commodity+', GRAIN - ACRES HARVESTED']
+        # dl.short_desc=[commodity+', GRAIN - ACRES PLANTED']
+        print('hello')
     elif 'WHEAT' in commodity:
         commodity='WHEAT'
 
@@ -576,7 +577,7 @@ def get_USA_area_harvested(commodity='CORN', aggregate_level='NATIONAL', state_n
     dl.short_desc=[commodity+' - ACRES HARVESTED']
 
     if commodity=='CORN':
-        dl.short_desc=[commodity+', GRAIN - ACRES PLANTED', commodity+', GRAIN - ACRES HARVESTED']
+        dl.short_desc=[commodity+', GRAIN - ACRES HARVESTED']
     elif 'WHEAT' in commodity:
         commodity='WHEAT'
 
