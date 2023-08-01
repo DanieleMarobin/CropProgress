@@ -75,7 +75,7 @@ def get_conditions_chart(df, state_name, class_desc, hovermode, col='Value'):
     fig.update_layout(hovermode=hovermode, width=1000, height=charts_height, xaxis=dict(tickformat="%b %d"))
     return fig
 
-def get_CCI_results(crop_to_estimate, dfs_conditions, dfs_yields, hovermode, n_years_for_trend, crop_year_start, rsq_analysis=False, progress_bar=None):
+def get_CCI_results(crop_to_estimate, dfs_conditions, dfs_yields, hovermode, n_years_for_trend, crop_year_start, rsq_analysis=False, progress_bar=None, TOTAL_US_DM=False):
     fo = []
     metrics={}
     proj_size=8; proj_color='orange'; proj_symbol='x'; proj_name='Proj Condition'
@@ -111,6 +111,12 @@ def get_CCI_results(crop_to_estimate, dfs_conditions, dfs_yields, hovermode, n_y
 
             # Last Year calculated from the conditions
             last_year = int(df['year'].max())
+
+            
+            # The below is to fix the fact that the CCI model for wheat keeps on giving a 'Bottom up' metric
+            if (not TOTAL_US_DM):
+                mask = (df_yield.index<last_year)
+                df_yield=df_yield[mask]
 
             # If there is no estimate for the Yield, add the trend Yield
             if not last_year in df_yield.index:

@@ -30,18 +30,15 @@ with st.sidebar:
     else:
         comm_download=commodity
 
-    if (False) and (commodity in st.session_state['crop_conditions']):
-        options_states=st.session_state['crop_conditions'][commodity]['options_states']
-    else:
-        st.session_state['crop_conditions'][commodity]={}
-        st.session_state['crop_conditions'][commodity]['options_states']=None
-        st.session_state['crop_conditions'][commodity]['dfs_conditions']=None
-        st.session_state['crop_conditions'][commodity]['df_yields']=None
-        options_states=['US Total']
+    st.session_state['crop_conditions'][commodity]={}
+    st.session_state['crop_conditions'][commodity]['options_states']=None
+    st.session_state['crop_conditions'][commodity]['dfs_conditions']=None
+    st.session_state['crop_conditions'][commodity]['df_yields']=None
+    options_states=['US Total']
 
-        with st.spinner('Checking Available States...'):
-            options_states=options_states+qs.get_USA_conditions_states(comm_download)
-            st.session_state['crop_conditions'][commodity]['options_states']=options_states
+    with st.spinner('Checking Available States...'):
+        options_states=options_states+qs.get_USA_conditions_states(comm_download)
+        st.session_state['crop_conditions'][commodity]['options_states']=options_states
     
     # Commodity customization
     if 'WHEAT, WINTER' in commodity.upper():
@@ -67,57 +64,50 @@ with st.sidebar:
 st.markdown(f"### Crop Conditions - {commodity} - {state}")
 
 # Retrieve the data
-if True or (st.session_state['crop_conditions'][commodity]['dfs_conditions'] is None):
-    if TOTAL_US_DM:
-        
-        # if 'US Total' in options_states:
-        #     options_states.remove('US Total')
-        complete=0
-        step=5
-        
-        selected=[s for s in options_states if s!='US Total']
-        progress_bar = st.progress(complete, text='Getting Conditions...')
-        dfs_conditions=qs.get_USA_conditions_parallel(comm_download.upper(), state_name=selected, parallel='thread')
+if TOTAL_US_DM:    
+    # if 'US Total' in options_states:
+    #     options_states.remove('US Total')
+    complete=0
+    step=5
+    
+    selected=[s for s in options_states if s!='US Total']
+    progress_bar = st.progress(complete, text='Getting Conditions...')
+    dfs_conditions=qs.get_USA_conditions_parallel(comm_download.upper(), state_name=selected, parallel='thread')
 
-        complete=complete+step; progress_bar.progress(complete, text='Getting Yields...')
+    complete=complete+step; progress_bar.progress(complete, text='Getting Yields...')
+    df_yields=qs.get_USA_yields_weights(comm_download.upper(), aggregate_level='STATE', state_name=selected,output='value')
+
+    complete=complete+step; progress_bar.progress(complete, text='Calculating Production Weights...')
+    df_prod_weights=qs.get_USA_prod_weights(commodity, aggregate_level='STATE', output='%')
+
+    complete=complete+step; progress_bar.progress(complete, text='Getting Planted Areas...')
+    df_plant= qs.get_USA_area_planted_weights(commodity, aggregate_level='STATE', output='value', n_years_estimate_by_class=5)
+
+    complete=complete+step; progress_bar.progress(complete, text='Getting Harversted Areas...')
+    df_harv=qs.get_USA_area_harvested_weights(commodity, aggregate_level='STATE', output='value')
+    
+    st.session_state['crop_conditions'][commodity]['dfs_conditions']=dfs_conditions
+    st.session_state['crop_conditions'][commodity]['df_yields']=df_yields
+    st.session_state['crop_conditions'][commodity]['df_prod_weights']=df_prod_weights
+    st.session_state['crop_conditions'][commodity]['df_plant']=df_plant
+    st.session_state['crop_conditions'][commodity]['df_harv']=df_harv        
+else:
+    selected=[state]
+    
+    if selected[0]=='US Total':
+        if (commodity.upper() in qs.wheat_by_class) or (commodity.upper()=='WHEAT, SPRING, DURUM'):
+            st.markdown('The USDA does NOT give a total for ' + commodity)
+            st.markdown('* Tick the "Avere US Total" on the left sidebar to Calculate it from State Yields')
+            st.markdown('* It takes some time, as I has to download the full history of state-by-state conditions')
+            st.stop()
+
+        dfs_conditions=qs.get_USA_conditions_parallel(comm_download.upper(),aggregate_level='NATIONAL', state_name=selected)
+        df_yields=qs.get_USA_yields_weights(comm_download.upper(), aggregate_level='NATIONAL', state_name=selected,output='value')
+        
+    else:
+        dfs_conditions=qs.get_USA_conditions_parallel(comm_download.upper(), state_name=selected)
         df_yields=qs.get_USA_yields_weights(comm_download.upper(), aggregate_level='STATE', state_name=selected,output='value')
 
-        complete=complete+step; progress_bar.progress(complete, text='Calculating Production Weights...')
-        df_prod_weights=qs.get_USA_prod_weights(commodity, aggregate_level='STATE', output='%')
-
-        complete=complete+step; progress_bar.progress(complete, text='Getting Planted Areas...')        
-        df_plant= qs.get_USA_area_planted_weights(commodity, aggregate_level='STATE', output='value', n_years_estimate_by_class=5)
-
-        complete=complete+step; progress_bar.progress(complete, text='Getting Harversted Areas...')        
-        df_harv=qs.get_USA_area_harvested_weights(commodity, aggregate_level='STATE', output='value')
-        
-        st.session_state['crop_conditions'][commodity]['dfs_conditions']=dfs_conditions
-        st.session_state['crop_conditions'][commodity]['df_yields']=df_yields
-        st.session_state['crop_conditions'][commodity]['df_prod_weights']=df_prod_weights
-        st.session_state['crop_conditions'][commodity]['df_plant']=df_plant
-        st.session_state['crop_conditions'][commodity]['df_harv']=df_harv        
-    else:
-        selected=[state]
-        
-        if selected[0]=='US Total':
-            if (commodity.upper() in qs.wheat_by_class) or (commodity.upper()=='WHEAT, SPRING, DURUM'):
-                st.markdown('The USDA does NOT give a total for ' + commodity)
-                st.markdown('* Tick the "Avere US Total" on the left sidebar to Calculate it from State Yields')
-                st.markdown('* It takes some time, as I has to download the full history of state-by-state conditions')
-                st.stop()
-
-            dfs_conditions=qs.get_USA_conditions_parallel(comm_download.upper(),aggregate_level='NATIONAL', state_name=selected)
-            df_yields=qs.get_USA_yields_weights(comm_download.upper(), aggregate_level='NATIONAL', state_name=selected,output='value')
-        else:
-            dfs_conditions=qs.get_USA_conditions_parallel(comm_download.upper(), state_name=selected)
-            df_yields=qs.get_USA_yields_weights(comm_download.upper(), aggregate_level='STATE', state_name=selected,output='value')
-else:
-    st.write('From cache')
-    dfs_conditions=st.session_state['crop_conditions'][commodity]['dfs_conditions']
-    df_yields=st.session_state['crop_conditions'][commodity]['df_yields']
-    df_prod_weights=st.session_state['crop_conditions'][commodity]['df_prod_weights']
-    df_plant=st.session_state['crop_conditions'][commodity]['df_plant']
-    df_harv=st.session_state['crop_conditions'][commodity]['df_harv']
 
 # Common calculations
 if True:
@@ -153,7 +143,7 @@ if True:
     
 
 # 'Home made' US total calculation
-if TOTAL_US_DM:    
+if TOTAL_US_DM:
     # Extract the Good and Excellent
     dfs_years, dfs_cond={}, {}
 
@@ -231,7 +221,7 @@ if TOTAL_US_DM:
     df_yields=df_yields[~mask]
 
     # Calculating the CCI Results
-    CCI_results = fu.get_CCI_results(crop_to_estimate, dfs_GE, df_yields,crop_year_start=crop_year_start, hovermode=hovermode, n_years_for_trend=n_years_for_trend, rsq_analysis=True)
+    CCI_results = fu.get_CCI_results(crop_to_estimate, dfs_GE, df_yields,crop_year_start=crop_year_start, hovermode=hovermode, n_years_for_trend=n_years_for_trend, rsq_analysis=True, TOTAL_US_DM=TOTAL_US_DM)
     progress_bar.empty()
 
     with st.expander('Calculation Data Details'):
@@ -268,7 +258,7 @@ if TOTAL_US_DM:
         df_state_yield_pred=df_state_yield_pred.T
         idx = [i for i in df_harv.index if i in df_state_yield_pred.index]
         df_state_yield_pred=df_state_yield_pred.loc[idx]
-        st.write('df_yield_pred', df_state_yield_pred)
+        # st.write('df_yield_pred', df_state_yield_pred)
 
 # Charts
 if True:
@@ -281,7 +271,6 @@ if True:
             with st.expander(state + ' - Details'):
                 st.dataframe(dfs_GE[state].sort_index(ascending=False))
        
-
         st.plotly_chart(f['fig'], use_container_width=True)
         with st.expander(state + ' - Details'):
             st.dataframe(f['df'].sort_index(ascending=False))
