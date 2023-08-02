@@ -249,13 +249,12 @@ if TOTAL_US_DM:
         st.write('df_prod_weights',df_prod_weights)
 
         all_conditions=all_conditions.sort_index(ascending=False)
-        # all_conditions=all_conditions.T
-        # idx = [i for i in df_harv.index if i in all_conditions.index]
-        # all_conditions=all_conditions.loc[idx]
         st.write('all_conditions',all_conditions)
 
         df_state_yield_pred=df_state_yield_pred.sort_index(ascending=False)
-        df_state_yield_pred = df_state_yield_pred.reset_index().drop_duplicates(subset=['index'], keep='first').set_index('index')
+        # the below condition is to find out if there are duplicates in the index
+        if (len(df_state_yield_pred.index) > len(set(df_state_yield_pred.index))):
+            df_state_yield_pred = df_state_yield_pred.reset_index().drop_duplicates(subset=['index'], keep='first').set_index('index')
 
         df_state_yield_pred=df_state_yield_pred.T
         idx = [i for i in df_harv.index if i in df_state_yield_pred.index]
