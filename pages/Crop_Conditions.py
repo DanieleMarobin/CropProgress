@@ -255,10 +255,13 @@ if TOTAL_US_DM:
         st.write('all_conditions',all_conditions)
 
         df_state_yield_pred=df_state_yield_pred.sort_index(ascending=False)
+        df_state_yield_pred = df_state_yield_pred.reset_index().drop_duplicates(subset=['index'], keep='first').set_index('index')
+
         df_state_yield_pred=df_state_yield_pred.T
         idx = [i for i in df_harv.index if i in df_state_yield_pred.index]
         df_state_yield_pred=df_state_yield_pred.loc[idx]
-        # st.write('df_yield_pred', df_state_yield_pred)
+        
+        st.write('df_yield_pred', df_state_yield_pred)
 
 # Charts
 if True:
