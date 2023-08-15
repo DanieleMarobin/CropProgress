@@ -275,8 +275,14 @@ def extract_conditions(df, crop_year_start, conditions_to_extract=['PCT EXCELLEN
         -> index is the actual day
         -> output columns are 'year', 'seas_day' (for the chart), 'Value' (GE = good + excellent)
     '''
+    weights_dict={'PCT EXCELLENT':5, 'PCT GOOD':4, 'PCT FAIR':3, 'PCT POOR':2, 'PCT VERY POOR':1,}
+    weights=[weights_dict[c] for c in df['unit_desc']]
 
     df[['year', 'Value']] = df[['year', 'Value']].astype(int)
+    
+    if len(conditions_to_extract)==5:
+        df['Value']=df['Value']*weights
+
     df['week_ending'] = pd.to_datetime(df['week_ending'])
 
     if 'WHEAT, WINTER' in df['short_desc'].values[0]:

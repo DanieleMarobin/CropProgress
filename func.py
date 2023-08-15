@@ -60,7 +60,7 @@ def get_progress_chart(commodity, state_name, progress_var, crop_year_start, hov
 
 def get_conditions_chart(df, state_name, class_desc, hovermode, col='Value'):
     last_year = df['year'].max()
-    title_text = state_name + ' - ' + class_desc +' GE Conditions'
+    title_text = state_name + ' - ' + class_desc +' Conditions'
 
     mask=df['year']<last_year-1
     fig = px.line(df[mask], x='seas_day', y=col, color='year', title=title_text, color_discrete_sequence=px.colors.qualitative.Plotly)
