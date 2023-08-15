@@ -354,7 +354,7 @@ def get_USA_progress_states(commodity):
     fo=[s.title() for s in fo]
     return fo
 def get_USA_progress_variables(commodity):
-    df=get_USA_progress(commodity,aggregate_level='NATIONAL',progress_var=None,years=[dt.today().year-1])
+    df=get_USA_progress(commodity,aggregate_level='NATIONAL',progress_var=None,years=range(dt.today().year-3, dt.today().year+1))
     fo=list(set(df['unit_desc']))
     fo.sort()
     fo=[s.title() for s in fo]

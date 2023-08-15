@@ -111,7 +111,6 @@ def get_CCI_results(crop_to_estimate, dfs_conditions, dfs_yields, hovermode, n_y
 
             # Last Year calculated from the conditions
             last_year = int(df['year'].max())
-
             
             # The below is to fix the fact that the CCI model for wheat keeps on giving a 'Bottom up' metric
             if (not TOTAL_US_DM):
@@ -229,7 +228,8 @@ def get_CCI_results(crop_to_estimate, dfs_conditions, dfs_yields, hovermode, n_y
             analysis='delta'
             x='Delta Conditions'
             y='Delta Yield'
-            fig = px.scatter(df, x=x, y=y, text='year', trendline="ols")
+            mask = df.index<dt.now().year
+            fig = px.scatter(df[mask], x=x, y=y, text='year', trendline="ols")
 
             all_models=px.get_trendline_results(fig).px_fit_results
             model=all_models[0]    

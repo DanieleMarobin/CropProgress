@@ -23,7 +23,7 @@ if True:
 # Commodity / State selection
 with st.sidebar:
     crop_year_start=dt(dt.today().year,1,1)
-    commodity = st.selectbox("Commodity", fu.commodities, 2, on_change=on_change_commodity)
+    commodity = st.selectbox("Commodity", fu.commodities, 0, on_change=on_change_commodity)
 
     if commodity.upper() in qs.wheat_by_class:
         comm_download=qs.wheat_by_class[commodity.upper()]
